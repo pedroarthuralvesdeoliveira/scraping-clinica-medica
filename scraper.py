@@ -2,17 +2,20 @@ import time
 import os 
 import pandas as pd
 import shutil
+from supabase import create_client, Client
 from selenium import webdriver 
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 
 
 from webdriver_manager.chrome import ChromeDriverManager
+
+from upload_to_supabase import send_data_to_supabase
 
 def check_softclyn_disponibility():
     """
@@ -69,9 +72,7 @@ def check_softclyn_disponibility():
             ok_button = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-bb-handler="ok"]'))
             )   
-            # Scroll to and click the button
-            # driver.execute_script("arguments[0].scrollIntoView(true);", ok_button)
-            # time.sleep(2)  # Brief pause to ensure scroll
+
             try:
                 ok_button.click()
             except ElementClickInterceptedException:
@@ -126,7 +127,7 @@ def check_softclyn_disponibility():
         time.sleep(7)
         
         downloaded_files = [f for f in os.listdir(download_dir) if f.endswith('.xls')]
-        default_download_dir = "%USERPROFILE%\Downloads"
+        default_download_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
         if not downloaded_files:
             # Check default Downloads folder if not found in custom directory
             downloaded_files = [f for f in os.listdir(default_download_dir) if f.endswith('.xls')]
@@ -144,18 +145,13 @@ def check_softclyn_disponibility():
             latest_file = max([os.path.join(download_dir, f) for f in downloaded_files], key=os.path.getctime)
             print(f"Downloaded file: {latest_file}")
 
-        # Optionally read the file
-        df = pd.read_excel(latest_file)
-        print(df.head())  # Preview data
-        return latest_file
-
+        send_data_to_supabase(latest_file)
     except TimeoutException as e:
         return {"status": "error", "message": f"A timeout occurred: {e}"}
     except Exception as e: # Catch other exceptions
         return {"status": "error", "message": str(e)}
     finally: 
         driver.quit()
-
 
 if __name__ == '__main__':
     check_softclyn_disponibility() 
