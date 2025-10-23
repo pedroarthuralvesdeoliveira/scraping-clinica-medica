@@ -1,139 +1,124 @@
 import os
 import pandas as pd
 from supabase import create_client, Client
-import xlrd
+import json
+import xlrd  
+import datetime  
+import traceback
 
-# def send_data_to_supabase(file_path):
-    # print(f"Attempting to send data from {file_path} to Supabase...")
-    
-    # SUPABASE_URL = os.environ.get("SUPABASE_URL")
-    # SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-    # SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE")
+from parse_clinic_report import parse_clinic_report 
 
-    # if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_TABLE]):
-    #     print("Error: Supabase environment variables (URL, KEY, TABLE) are not set.")
-    #     return {"status": "error", "message": "Supabase credentials missing."}
-
-    # try:
-        # supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        # df = pd.read_excel(file_path, engine='xlrd', header=None)
-        # print(f"Successfully read {len(df)} rows from {file_path}.")
-
-        # data_to_insert = df.to_dict(orient='records')
-
-        # response = supabase.table(SUPABASE_TABLE).insert(data_to_insert).execute()
-        # print(f"Data sent to Supabase. Response: {response.data}")
-        # return {"status": "success", "message": f"Uploaded {len(df)} rows."}
-    # except Exception as e:
-        # print(f"Error sending data to Supabase: {e}")
-        # return {"status": "error", "message": str(e)}
-
-# def send_data_to_supabase(file_path):
-#     try:
-#         # Try reading with openpyxl for .xlsx files
-#         df = pd.read_excel(file_path, engine='openpyxl', header=None)
-#         print(f"Successfully read {len(df)} rows from {file_path}.")
-#         data_to_insert = df.to_dict(orient='records')
-#         return {"status": "success", "message": f"Read {len(df)} rows."}
-#     except Exception as e:
-#         print(f"Error reading with openpyxl: {e}")
-#         # Fallback to xlrd for .xls files
-#         try:
-#             workbook = xlrd.open_workbook(file_path, ignore_workbook_corruption=True)
-#             df = pd.read_excel(workbook)
-#             # df = pd.read_excel(file_path, engine='xlrd', header=None)
-#             print(f"Successfully read {len(df)} rows from {file_path}.")
-#             print(df.head())            
-#             data_to_insert = df.to_dict(orient='records')
-#             return {"status": "success", "message": f"Read {len(df)} rows."}
-#         except Exception as e:
-#             return {"status": "error", "message": str(e)}
+def nan_to_none(value):
+    if pd.isna(value):
+        return None
+    return value
 
 def send_data_to_supabase(file_path):
+    print(f"Iniciando processo de parse e upload para {file_path}...")
+    
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+    SUPABASE_TABLE = "appointments"
+
+    if not all([SUPABASE_URL, SUPABASE_KEY]):
+        print("Erro: Variáveis de ambiente SUPABASE_URL ou SUPABASE_KEY não definidas.")
+        return {"status": "error", "message": "Supabase credentials missing."}
+
     try:
-        # Read the workbook with xlrd, ignoring corruption
-        workbook = xlrd.open_workbook(file_path, ignore_workbook_corruption=True)
-        # Read the first sheet into a DataFrame
-        df = pd.read_excel(workbook)
+        parsed_result = parse_clinic_report(file_path)
+        
+        if parsed_result["status"] == "error":
+            print(f"Erro ao processar o arquivo Excel: {parsed_result['message']}")
+            return parsed_result
+            
+        data_by_doctor = parsed_result["data"]
+        
+        all_appointments_to_insert = []
+        
+        for doctor_name, appointments_list in data_by_doctor.items():
+            for appt in appointments_list:
 
-        # Initialize variables to store results
-        doctors_data = {}
-        current_doctor = None
-        header_row = None
-        header_row_index = None
+                raw_datetime_str = appt.get("DATA/HORA")
+                iso_timestamp = None
+                if raw_datetime_str and pd.notna(raw_datetime_str):
+                    dt_str = str(raw_datetime_str).strip()
+                    dt_str_corrigida = dt_str.replace(" - ", " ")
 
-        # Iterate through the DataFrame
-        for index, row in df.iterrows():
-            # Check if this is a doctor name (value in first column, rest may be merged)
-            if pd.notna(row.iloc[0]) and (all(pd.isna(row.iloc[i]) for i in range(1, len(row))) or row.iloc[1] == row.iloc[0]):
-                if current_doctor and header_row is not None:
-                    # Process the previous doctor's data, stopping before the summary row
-                    start_idx = header_row_index + 1
-                    # Look ahead to find the summary row
-                    end_idx = index
-                    for j in range(index - 1, start_idx - 1, -1):
-                        if pd.notna(df.iloc[j, 0]) and "Total de Registros" in str(df.iloc[j, 0]):
-                            end_idx = j
-                            break
-                    doctor_df = df.iloc[start_idx:end_idx].dropna(how='all')
-                    if not doctor_df.empty:
-                        # Ensure header matches the number of columns (should be 11)
-                        expected_cols = len(doctor_df.columns)
-                        header_row = [col for col in header_row if col in ["DATA/HORA", "PACIENTE", "CARTEIRINHA", "TELEFONE", "CONVÊNIO", "TIPO", "AGEN. POR", "RESPONSÁVEL", "OBSERVAÇÕES", "TAGS", "STATUS"]]
-                        if len(header_row) > expected_cols:
-                            header_row = header_row[:expected_cols]
-                        elif len(header_row) < expected_cols:
-                            header_row.extend([""] * (expected_cols - len(header_row)))
-                        doctor_df.columns = header_row
-                        doctors_data[current_doctor] = doctor_df
-                current_doctor = row.iloc[0]
-                header_row_index = index
-                header_row = None
-            # Check if this is the header row (after doctor name, before data)
-            elif current_doctor and header_row is None and pd.notna(row.iloc[0]):
-                header_row = row.dropna().tolist()
-                # Filter to expected headers and adjust length
-                header_row = [col for col in header_row if col in ["DATA/HORA", "PACIENTE", "CARTEIRINHA", "TELEFONE", "CONVÊNIO", "TIPO", "AGEN. POR", "RESPONSÁVEL", "OBSERVAÇÕES", "TAGS", "STATUS"]]
-                if len(header_row) == 0:
-                    header_row = ["DATA/HORA", "PACIENTE", "CARTEIRINHA", "TELEFONE", "CONVÊNIO", "TIPO", "AGEN. POR", "RESPONSÁVEL", "OBSERVAÇÕES", "TAGS", "STATUS"]
+                    formats_to_try = [
+                        '%d/%m/%Y %H:%M:%S',  
+                        '%d/%m/%Y %H:%M'    
+                    ]
 
-        # Process the last doctor's data
-        if current_doctor and header_row is not None:
-            start_idx = header_row_index + 1
-            # Look ahead to find the summary row for the last doctor
-            end_idx = len(df)
-            for j in range(len(df) - 1, start_idx - 1, -1):
-                if pd.notna(df.iloc[j, 0]) and "Total de Registros" in str(df.iloc[j, 0]):
-                    end_idx = j
-                    break
-            doctor_df = df.iloc[start_idx:end_idx].dropna(how='all')
-            if not doctor_df.empty:
-                expected_cols = len(doctor_df.columns)
-                header_row = [col for col in header_row if col in ["DATA/HORA", "PACIENTE", "CARTEIRINHA", "TELEFONE", "CONVÊNIO", "TIPO", "AGEN. POR", "RESPONSÁVEL", "OBSERVAÇÕES", "TAGS", "STATUS"]]
-                if len(header_row) > expected_cols:
-                    header_row = header_row[:expected_cols]
-                elif len(header_row) < expected_cols:
-                    header_row.extend([""] * (expected_cols - len(header_row)))
-                doctor_df.columns = header_row
-                doctors_data[current_doctor] = doctor_df
+                    dt_obj = None
 
-        # Print or process the results
-        for doctor, data in doctors_data.items():
-            print(f"Doctor: {doctor}")
-            print(data)
-            # Add Supabase upload logic here if needed
-            # data_to_insert = data.to_dict(orient='records')
-            # supabase.table(SUPABASE_TABLE).insert(data_to_insert).execute()
+                    for fmt in formats_to_try:
+                        try:
+                            dt_obj = datetime.datetime.strptime(dt_str_corrigida, fmt)
+                            iso_timestamp = dt_obj.isoformat()
+                            break  
+                        except ValueError:
+                            continue
 
-        return {"status": "success", "message": f"Processed data for {len(doctors_data)} doctors."}
+                    if dt_obj is None:
+                        print(f"Aviso: Ignorando data/hora mal formatada (nenhum formato bateu): {dt_str}")
+                        continue
+
+                options_data = {
+                    "convenio": appt.get("CONVÊNIO"),
+                    "carteirinha": appt.get("CARTEIRINHA"),
+                    "agendado_por": appt.get("AGEN. POR"),
+                    "responsavel": appt.get("RESPONSÁVEL"),
+                    "tags": appt.get("TAGS"),
+                }
+                options_json = json.dumps({k: v for k, v in options_data.items() if pd.notna(v)})
+
+                record_to_insert = {
+                    "timestamp": iso_timestamp, 
+                    "patient_name": nan_to_none(appt.get("PACIENTE")), 
+                    "type": nan_to_none(appt.get("TIPO")), 
+                    "options": options_json, 
+                    "status": nan_to_none(appt.get("STATUS")), 
+                    "phone_number": nan_to_none(appt.get("TELEFONE")), 
+                    "responsible_physician": doctor_name, 
+                    "observation": nan_to_none(appt.get("OBSERVAÇÕES")) 
+                }
+                
+                if iso_timestamp:
+                    all_appointments_to_insert.append(record_to_insert)
+
+        if not all_appointments_to_insert:
+            print("Nenhum agendamento válido encontrado no arquivo.")
+            return {"status": "warning", "message": "No valid appointments found."}
+
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        
+        print(f"Preparando para inserir {len(all_appointments_to_insert)} registros no Supabase...")
+
+        response = supabase.table(SUPABASE_TABLE).insert(all_appointments_to_insert).execute()
+        
+        if hasattr(response, 'data') and response.data:
+            print(f"Sucesso! Inseridos {len(response.data)} registros.")
+            return {"status": "success", "message": f"Uploaded {len(response.data)} rows."}
+        elif hasattr(response, 'error') and response.error:
+            print(f"Erro do Supabase: {response.error}")
+            return {"status": "error", "message": str(response.error)}
+        else:
+             print(f"Resposta inesperada do Supabase: {response}")
+             return {"status": "error", "message": "Unknown Supabase response."}
+
     except Exception as e:
+        print(f"Erro fatal na função send_data_to_supabase: {e}")
+        print(traceback.format_exc())
         return {"status": "error", "message": str(e)}
 
-# TODO Pular linha que tem somente uma coluna com o nome do doutor responsavel, e pular linha de total
-# Acessar dados somente de colunas de A a K
-
-# Run directly
 if __name__ == "__main__":
-    test_file = "download/26relatorio.xls"  # Replace with real path
-    result = send_data_to_supabase(test_file)
-    print(result)
+    os.environ["SUPABASE_URL"] = "https://izuzdfuemhrmgaboskux.supabase.co"
+    os.environ["SUPABASE_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dXpkZnVlbWhybWdhYm9za3V4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTAwOTQsImV4cCI6MjA3NjY2NjA5NH0.eh0TI0s7zw59Wb0bLr6qQedJCeIAOSnTlqVXMZexR2s"
+    
+    arquivo_exemplo = "download/26relatorio.xls" 
+    
+    if os.path.exists(arquivo_exemplo):
+        send_data_to_supabase(arquivo_exemplo)
+    else:
+        print(f"Arquivo de exemplo não encontrado em: {arquivo_exemplo}")
+        print("Por favor, baixe o arquivo ou ajuste o caminho em 'arquivo_exemplo'.")

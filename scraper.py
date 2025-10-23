@@ -1,8 +1,6 @@
 import time
 import os 
-import pandas as pd
 import shutil
-from supabase import create_client, Client
 from selenium import webdriver 
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -15,14 +13,14 @@ from selenium.webdriver.chrome.options import Options
 
 from webdriver_manager.chrome import ChromeDriverManager
 
-from upload_to_supabase import send_data_to_supabase
+from parse_clinic_report import parse_clinic_report
 
 def check_softclyn_disponibility():
     """
     Executa a automação completa no SoftClyn e retorna o próximo horário.
     """
 
-    # Configuração do WebDriver
+    # WebDriver configuration
     debugger_address = 'localhost:9222'
 
     base_dir = os.path.abspath(os.path.dirname(__file__))  
@@ -145,7 +143,7 @@ def check_softclyn_disponibility():
             latest_file = max([os.path.join(download_dir, f) for f in downloaded_files], key=os.path.getctime)
             print(f"Downloaded file: {latest_file}")
 
-        send_data_to_supabase(latest_file)
+        parse_clinic_report(latest_file)
     except TimeoutException as e:
         return {"status": "error", "message": f"A timeout occurred: {e}"}
     except Exception as e: # Catch other exceptions
