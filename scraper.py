@@ -29,6 +29,8 @@ def check_softclyn_disponibility():
         os.makedirs(download_dir)
 
     options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--window-size=1920,1080") 
     options.add_experimental_option("debuggerAddress", debugger_address)
     prefs = {"download.default_directory": download_dir,
          "download.prompt_for_download": False,
