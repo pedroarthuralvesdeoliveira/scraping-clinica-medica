@@ -1,5 +1,4 @@
 import json 
-import os 
 from dotenv import load_dotenv
 from scraper import check_softclyn_disponibility
 
