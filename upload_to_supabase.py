@@ -2,7 +2,6 @@ import os
 import pandas as pd
 from supabase import create_client, Client
 import json
-import xlrd  
 import datetime  
 import traceback
 
