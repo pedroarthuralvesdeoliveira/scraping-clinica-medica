@@ -13,7 +13,7 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-def schedule_appointment(medico, data_desejada, horario_desejado, nome_paciente, convenio, tipo_atendimento):
+def schedule_appointment(medico, data_desejada, horario_desejado, nome_paciente, tipo_atendimento):
     """
     Executa a automação de agendamento no SoftClyn.
     """
