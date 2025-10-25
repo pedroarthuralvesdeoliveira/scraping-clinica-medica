@@ -158,7 +158,6 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
         return {"status": "error", "message": str(e)}
     finally:
         print("Fechando o navegador.")
-        driver.quit()
 
 if __name__ == '__main__':
     medico_para_cancelar = "Danielle Braga - Médico endocrinologista e metabologista "

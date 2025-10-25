@@ -144,13 +144,20 @@ def check_softclyn_disponibility():
             latest_file = max([os.path.join(download_dir, f) for f in downloaded_files], key=os.path.getctime)
             print(f"Downloaded file: {latest_file}")
 
-        parse_clinic_report(latest_file)
+        if not latest_file:
+             print("No file downloaded.")
+             return {"status": "error", "message": "File not found after download."}
+
+        print(f"Downloaded file: {latest_file}")
+
+        # parse_clinic_report(latest_file)
+        return {"status": "success", "downloaded_file_path": latest_file}
     except TimeoutException as e:
         return {"status": "error", "message": f"A timeout occurred: {e}"}
     except Exception as e: # Catch other exceptions
         return {"status": "error", "message": str(e)}
     finally: 
-        driver.quit()
+        print("Fechando o navegador...")
 
 if __name__ == '__main__':
     check_softclyn_disponibility() 
