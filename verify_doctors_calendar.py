@@ -7,11 +7,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from datetime import date, timedelta
 
-def verify_doctors_calendar(medico, data_desejada=None, horario_desejado: str | None = "070000"):
+def verify_doctors_calendar(
+        medico: str, 
+        data_desejada: str | None = None,
+        horario_desejado: str | None = None,
+        horario_inicial: str | None = "07:00",
+        horario_final: str | None = "19:30"
+):
     """
     Verifica a disponibilidade da agenda de um médico.
     """
@@ -96,7 +101,7 @@ def verify_doctors_calendar(medico, data_desejada=None, horario_desejado: str | 
 
         print(f"Profissional selecionado: {medico}")
 
-        if data_desejada or horario_desejado:
+        if data_desejada and horario_desejado: 
             dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
             dateAppointment.clear()
             dateAppointment.send_keys(data_desejada)
@@ -127,9 +132,6 @@ def verify_doctors_calendar(medico, data_desejada=None, horario_desejado: str | 
             except NoSuchElementException:
                 pass 
 
-            if horario_desejado is None:
-                horario_desejado = "07:00"
-
             horario_id = horario_desejado.replace(":", "") + "00" 
 
             elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
@@ -141,8 +143,53 @@ def verify_doctors_calendar(medico, data_desejada=None, horario_desejado: str | 
             else:
                 print(f"O horário {horario_desejado} do dia {data_desejada} está DISPONÍVEL.")
                 return {"status": "available", "message": f"Horário {horario_desejado} em {data_desejada} disponível."}
-        
-        else:
+
+        elif data_desejada:
+            dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
+            dateAppointment.clear()
+            dateAppointment.send_keys(data_desejada)
+
+            driver.find_element(By.TAG_NAME, "body").click()
+            time.sleep(0.5)
+
+            try:
+                aba_agenda = wait.until(EC.presence_of_element_located((By.ID, "abaAgenda")))
+                driver.execute_script("arguments[0].click();", aba_agenda)
+            except Exception as e:
+                print(f"Erro ao tentar clicar em abaAgenda via JS: {e}")
+                return {"status": "error", "message": "Falha ao clicar na aba de agenda."}
+
+            try:
+                wait.until(EC.presence_of_element_located((By.XPATH, "//tr[@id='070000']")))
+            except TimeoutException:
+                print(f"A grade de horários para {data_desejada} não carregou.")
+                return {"status": "error", "message": "Falha ao carregar a grade de horários."}
+
+            print(f"Data selecionada: {data_desejada}. Verificando horários entre {horario_inicial} e {horario_final}.")
+
+            try:
+                driver.find_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+                return {"status": "unavailable", "message": f"A data {data_desejada} não tem expediente."}
+            except NoSuchElementException:
+                pass
+
+            horario_inicial_id = int(horario_inicial.replace(":", "") + "00")
+            horario_final_id = int(horario_final.replace(":", "") + "00")
+
+            elementos_filhos_xpath = f"//tr[@class='ui-droppable' and normalize-space(td[2]) = '' and not(td[2]/*)]"
+            elementos_filhos = driver.find_elements(By.XPATH, elementos_filhos_xpath)   
+
+            available_times = []
+
+            for slot_tr in elementos_filhos:
+                slot_id = slot_tr.get_attribute("id")
+                print(f"Id do slot: {slot_id}, inicial: {horario_inicial_id}, final: {horario_final_id}")
+                if slot_id and (int(slot_id) >= horario_inicial_id) and (int(slot_id) <= horario_final_id):
+                    # print(f"Horário {slot_tr.find_element(By.TAG_NAME, 'a').text} disponível.")
+                    available_times.append(slot_tr.find_element(By.TAG_NAME, "a").text)
+            
+            return {"status": "available_slots", "date": data_desejada, "slots": available_times}
+        else: 
             current_date = date.today()
             for i in range(365): 
                 check_date_str = current_date.strftime("%d/%m/%Y")
@@ -193,6 +240,7 @@ def verify_doctors_calendar(medico, data_desejada=None, horario_desejado: str | 
                         available_slot_xpath = "//a[starts-with(@href, 'javascript:marcaHorarioAgenda')]"
                         
                         short_wait = WebDriverWait(driver, WAIT_TIME_SHORT)
+                        
                         available_slots = short_wait.until(
                             EC.presence_of_all_elements_located((By.XPATH, available_slot_xpath))
                         )
@@ -229,9 +277,13 @@ if __name__ == '__main__':
     medico_para_verificar = "Danielle Braga - Médico endocrinologista e metabologista "
     
     # Exemplo 1: Verificar um horário específico
-    # resultado = verify_doctors_calendar(medico_para_verificar, "24/10/2025", "14:00")
+    # resultado = verify_doctors_calendar(medico_para_verificar, data_desejada="24/10/2025", horario_desejado="14:00")
     # print(resultado)
 
-    # Exemplo 2: Procurar o próximo horário livre
-    resultado = verify_doctors_calendar(medico_para_verificar)
+    # Exemplo 2: Verificar todos os horários disponíveis em um dia (e intervalo)
+    resultado = verify_doctors_calendar(medico_para_verificar, data_desejada="24/10/2025", horario_inicial="10:00", horario_final="18:00")
     print(resultado)
+
+    # Exemplo 3: Procurar o próximo horário livre (sem data)
+    # resultado = verify_doctors_calendar(medico_para_verificar)
+    # print(resultado)
