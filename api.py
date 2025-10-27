@@ -72,7 +72,7 @@ def api_cancel(payload: CancelPayload):
     return resultado
 
 @app.get("/availability", dependencies=[Depends(get_api_key)])
-def api_check_availability(medico: str, data_desejada: str = None, horario_desejado: str = None):
+def api_check_availability(medico: str, data_desejada: str = None, horario_desejado: str = None, horario_inicial: str = None, horario_final: str = None):
     """
     Verifica a disponibilidade.
     Ex: /availability?medico=Dr.Nome&data_desejada=25/10/2025&horario_desejado=14:00
@@ -82,7 +82,9 @@ def api_check_availability(medico: str, data_desejada: str = None, horario_desej
     resultado = verify_doctors_calendar(
         medico,
         data_desejada,
-        horario_desejado
+        horario_desejado,
+        horario_inicial,
+        horario_final
     )
     return resultado
 
