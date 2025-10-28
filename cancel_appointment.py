@@ -14,11 +14,14 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     """
     Cancels an appointment in SoftClyn.
     """
-    debugger_address = 'localhost:9222'
 
     options = Options()
-    options.add_experimental_option("debuggerAddress", debugger_address)
-    
+    options.add_argument("--lang=pt-BR")
+    # options.add_argument("--headless=new")
+    # options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
+    # options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
+    # options.add_argument("--window-size=1920,1080")
+
     prefs = {
          "profile.default_content_setting_values.notifications": 0
          }
@@ -48,8 +51,6 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
    
         login = wait.until(EC.element_to_be_clickable((By.ID, "btLogin")))
         login.click()
-
-        time.sleep(5)
 
         try:
             print("Waiting for modal...")
@@ -92,14 +93,10 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
 
         print(f"Profissional selecionado: {medico}")
 
-        time.sleep(2)
-
         dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
         dateAppointment.clear()
         dateAppointment.send_keys(data_desejada)
         dateAppointment.send_keys(Keys.TAB)
-
-        time.sleep(3)
         
         print(f"Data selecionada: {data_desejada}")
 
@@ -115,23 +112,17 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
             driver.execute_script("arguments[0].click();", cancel_span)
             print(f"Ícone de cancelamento para o paciente {nome_paciente} no horário {horario_desejado} clicado.")
 
-            time.sleep(2)
-
             desmarcado_button = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-bb-handler='danger']"))
             )
             desmarcado_button.click()
             print("Botão 'Desmarcado' clicado.")
 
-            time.sleep(2)
-
             reason_input = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input.bootbox-input-text"))
             )
             reason_input.send_keys("não disse o motivo")
             print("Motivo do cancelamento preenchido.")
-
-            time.sleep(1)
 
             confirm_button = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-bb-handler='confirm']"))
@@ -142,8 +133,6 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
         except TimeoutException:
             print(f"Erro: Não foi possível encontrar o agendamento para o paciente {nome_paciente} no horário {horario_desejado}.")
             return {"status": "error", "message": "Agendamento não encontrado."}
-
-        time.sleep(5)
         
         print("Cancelamento concluído com sucesso!")
         return {"status": "success", "message": "Agendamento cancelado."}
@@ -158,6 +147,11 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
         return {"status": "error", "message": str(e)}
     finally:
         print("Fechando o navegador.")
+        if 'driver' in locals():
+            driver.quit()
+        else:
+            print("Driver não encontrado.")
+        
 
 if __name__ == '__main__':
     medico_para_cancelar = "Danielle Braga - Médico endocrinologista e metabologista "

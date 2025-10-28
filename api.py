@@ -8,8 +8,6 @@ from dotenv import load_dotenv
 from schedule_appointment import schedule_appointment
 from cancel_appointment import cancel_appointment
 from verify_doctors_calendar import verify_doctors_calendar
-from scraper import check_softclyn_disponibility
-from upload_to_supabase import send_data_to_supabase
 
 load_dotenv() 
 
@@ -19,6 +17,9 @@ class SchedulePayload(BaseModel):
     data_desejada: str
     horario_desejado: str
     nome_paciente: str
+    data_nascimento: str
+    cpf: str
+    telefone: str
     tipo_atendimento: str
 
 class CancelPayload(BaseModel):
@@ -42,22 +43,31 @@ async def get_api_key(key: str = Security(api_key_header)):
 app = FastAPI(title="SoftClyn Bot API")
 
 
-@app.post("/schedule", dependencies=[Depends(get_api_key)])
+@app.post("/schedule", dependencies=[Depends(get_api_key)], summary="Agendar consulta")
 def api_schedule(payload: SchedulePayload):
     """
     Recebe um JSON do N8N e agenda uma consulta.
     """
     print(f"Recebido job de agendamento para: {payload.nome_paciente}")
+    
+    paciente_info = {
+        "nome": payload.nome_paciente,
+        "data_nascimento": payload.data_nascimento,
+        "cpf": payload.cpf,
+        "telefone": payload.telefone,
+        "tipo_atendimento": payload.tipo_atendimento
+    }
+
     resultado = schedule_appointment(
         payload.medico,
         payload.data_desejada,
-        payload.horario_desejado,
-        payload.nome_paciente,
+        paciente_info,             
+        payload.horario_desejado,  
         payload.tipo_atendimento
     )
     return resultado
 
-@app.post("/cancel", dependencies=[Depends(get_api_key)])
+@app.post("/cancel", dependencies=[Depends(get_api_key)], summary="Cancelar consulta")
 def api_cancel(payload: CancelPayload):
     """
     Recebe um JSON do N8N e cancela uma consulta.
@@ -71,7 +81,7 @@ def api_cancel(payload: CancelPayload):
     )
     return resultado
 
-@app.get("/availability", dependencies=[Depends(get_api_key)])
+@app.get("/availability", dependencies=[Depends(get_api_key)], summary="Verificar disponibilidade de consulta")
 def api_check_availability(medico: str, data_desejada: str = None, horario_desejado: str = None, horario_inicial: str = None, horario_final: str = None):
     """
     Verifica a disponibilidade.
@@ -87,32 +97,6 @@ def api_check_availability(medico: str, data_desejada: str = None, horario_desej
         horario_final
     )
     return resultado
-
-@app.post("/run-report-etl", dependencies=[Depends(get_api_key)])
-def api_run_report_etl():
-    """
-    Endpoint "mestre" que baixa o relatório e o envia ao Supabase.
-    """
-    print("Iniciando ETL de Relatório...")
-    
-    # 1. Baixar o arquivo
-    download_result = check_softclyn_disponibility()
-    if download_result["status"] == "error":
-        return download_result
-    
-    file_path = download_result["downloaded_file_path"]
-    
-    # 2. Fazer o parse e upload
-    upload_result = send_data_to_supabase(file_path)
-    
-    # (Opcional) Limpar o arquivo baixado
-    try:
-        os.remove(file_path)
-        print(f"Arquivo {file_path} limpo.")
-    except Exception as e:
-        print(f"Erro ao limpar arquivo: {e}")
-
-    return upload_result
 
 if __name__ == "__main__":
     print("Iniciando API de automação em http://localhost:8000")
