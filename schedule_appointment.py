@@ -13,17 +13,17 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, tipo_atendimento):
+def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, horario_desejado: str | None = None, tipo_atendimento: str | None = "Primeira vez"):
     """
     Executa a automação de agendamento no SoftClyn.
     """
     
-    debugger_address = 'localhost:9222' 
-
     options = Options()
+    options.add_argument("--lang=pt-BR")
     # options.add_argument("--headless=new")
-    # options.add_argument("--window-size=1920,1080") 
-    options.add_experimental_option("debuggerAddress", debugger_address) 
+    # options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
+    # options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
+    # options.add_argument("--window-size=1920,1080")
     
     prefs = {
          "profile.default_content_setting_values.notifications": 0
@@ -55,7 +55,7 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
         login = wait.until(EC.element_to_be_clickable((By.ID, "btLogin")))
         login.click()
 
-        time.sleep(5) 
+        (3) 
 
         try:
             print("Waiting for modal...")
@@ -98,20 +98,20 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
 
         print(f"Profissional selecionado: {medico}")
 
-        time.sleep(2) 
+        (2) 
 
         dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
         dateAppointment.clear()
         dateAppointment.send_keys(data_desejada)
 
-        time.sleep(3)
+        (3)
 
         appointments_grid = wait.until(
             EC.element_to_be_clickable((By.ID, "abaAgenda"))
         )
         appointments_grid.click()
 
-        time.sleep(3)
+        (3)
 
         dateAppointment.send_keys(Keys.TAB) 
         print(f"Data selecionada: {data_desejada}") 
@@ -124,9 +124,8 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
             print(f"Erro ao formatar o horário: {e}")
             raise ValueError("Formato de horário inválido. Esperado HH:MM")
 
-        print(f"Horário formatado: {horario_id}")
         
-        time.sleep(5) 
+        (3) 
 
         try:
             horario_tr_xpath = f"//tr[@id='{horario_id}']"
@@ -136,7 +135,7 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
             print(f"Erro: A linha de horário {horario_desejado} (ID: {horario_id}) não foi encontrada.")
             return {"status": "error", "message": f"Horário {horario_desejado} não existe na grade."}
 
-        time.sleep(5) 
+        (5) 
 
         try:
             elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
@@ -177,13 +176,14 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
         )
         select_type_of_search.click()
 
-        time.sleep(2)
+        (2)
 
         select = Select(select_type_of_search)
         select.select_by_value("cpf")
 
-        time.sleep(2)
+        (2)
 
+        cpf_paciente = paciente_info['cpf']
         campo_pesquisa_paciente = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//input[@placeholder='Digite o Nome do Paciente para Pesquisar']"))
         )
@@ -191,17 +191,104 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
         campo_pesquisa_paciente.send_keys(Keys.ENTER)
         print(f"Pesquisando paciente: {cpf_paciente}")
 
-        paciente_encontrado_xpath = "//td[contains(@onclick, 'selecionaPacienteAgenda')]"
+        try:
+            paciente_encontrado_xpath = "//td[contains(@onclick, 'selecionaPacienteAgenda')]"
+            paciente_encontrado = wait.until(
+                EC.element_to_be_clickable((By.XPATH, paciente_encontrado_xpath))
+            )
+            paciente_encontrado.click()
+            print(f"Paciente com CPF {cpf_paciente} encontrado e selecionado.")
 
+        except TimeoutException:
+            print(f"Paciente com CPF {cpf_paciente} não encontrado. Iniciando criação de novo paciente.")
+            
+            criar_paciente_xpath = "//td[contains(@onclick, 'adicionaPacienteNovoAgenda')]"
+            criar_paciente_button = wait.until(
+                EC.element_to_be_clickable((By.XPATH, criar_paciente_xpath))
+            )
+            criar_paciente_button.click()
 
-        paciente_encontrado = wait.until(
-            EC.element_to_be_clickable((By.XPATH, paciente_encontrado_xpath))
-        )
-        paciente_encontrado.click()
-        
-        print(f"Paciente selecionado: {cpf_paciente}")
+            (2)
 
-        time.sleep(2) 
+            # Nome
+            nome_paciente_input = wait.until(EC.element_to_be_clickable((By.ID, "nomePaciente")))
+            nome_paciente_input.clear()
+            nome_paciente_input.send_keys(paciente_info['nome'])
+            print(f"Nome preenchido: {paciente_info['nome']}")
+
+            (2)
+
+            # Data de Nascimento
+            data_nascimento_input = wait.until(EC.element_to_be_clickable((By.ID, "dataNascimentoAgenda")))
+            data_nascimento_input.send_keys(paciente_info['data_nascimento'])
+            print(f"Data de nascimento preenchida: {paciente_info['data_nascimento']}")
+
+            (2)
+
+            
+            # Telefone
+            telefone_paciente_input = wait.until(EC.element_to_be_clickable((By.ID, "numeroTelefone")))
+            telefone_paciente_input.click()  
+            telefone_paciente_input.clear()  
+            telefone_paciente_input.send_keys(paciente_info["telefone"])
+            if telefone_paciente_input.text == "":
+                telefone_paciente_input = wait.until(EC.presence_of_element_located((By.ID, "numeroTelefone")))
+                telefone_val = paciente_info["telefone"]
+                driver.execute_script("arguments[0].value = arguments[1];", telefone_paciente_input, telefone_val)
+                driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", telefone_paciente_input)
+            print(f"Telefone preenchido: {paciente_info["telefone"]}")
+
+            (4)
+
+            # CPF
+            cpf_selector = "input[id='cpfPaciente'][type='text']"
+            
+            cpf_paciente_input = wait.until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, cpf_selector))
+            )
+            
+            cpf_paciente_input.click()
+            cpf_paciente_input.clear() 
+            cpf_paciente_input.send_keys(paciente_info["cpf"])
+            print(f"CPF preenchido: {paciente_info['cpf']}")
+
+            select_tipo_clickable = wait.until(
+                EC.element_to_be_clickable((By.ID, "select2-tipoAtendimento-container"))
+            )
+            select_tipo_clickable.click()
+
+            search_field_tipo = wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
+            )
+
+            (2)
+
+            tipo_atendimento_limpo = tipo_atendimento.strip()
+            search_field_tipo.send_keys(tipo_atendimento_limpo)
+
+            tipo_option_xpath = f"//li[contains(@class, 'select2-results__option') and normalize-space()='{tipo_atendimento_limpo}']"
+            
+            tipo_option = wait.until(
+                EC.element_to_be_clickable((By.XPATH, tipo_option_xpath))
+            )
+            tipo_option.click()
+
+            print(f"Tipo de Atendimento selecionado: {tipo_atendimento}")
+
+            (2) 
+
+            botao_salvar = wait.until(
+                EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
+            )
+            botao_salvar.click()
+            print("Clicando em Salvar...")
+
+            (5) 
+            
+            print("Agendamento concluído com sucesso!")
+            return {"status": "success", "message": "Agendamento realizado."}
+
+        (2) 
 
         select_tipo_clickable = wait.until(
             EC.element_to_be_clickable((By.ID, "select2-tipoAtendimento-container"))
@@ -224,7 +311,7 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
 
         print(f"Tipo de Atendimento selecionado: {tipo_atendimento}")
 
-        time.sleep(2) 
+        (2) 
 
         botao_salvar = wait.until(
             EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
@@ -232,7 +319,7 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
         botao_salvar.click()
         print("Clicando em Salvar...")
 
-        time.sleep(5) 
+        (5) 
         
         print("Agendamento concluído com sucesso!")
         return {"status": "success", "message": "Agendamento realizado."}
@@ -247,21 +334,32 @@ def schedule_appointment(medico, data_desejada, horario_desejado, cpf_paciente, 
         return {"status": "error", "message": str(e)}
     finally: 
         print("Fechando o navegador.")
+        if 'driver' in locals():
+            driver.quit()
+        else: 
+            print("Driver não encontrado.")
+        
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
     medico_para_agendar = "Danielle Braga - Médico endocrinologista e metabologista"
     data_do_agendamento = "24/10/2025"
-    horario_do_agendamento = "13:00"
-    # paciente_para_agendar = "Denis Bechelli da Costa"
-    cpf = "054.838.866-07"
-    convenio_do_paciente = "Particular"
+    horario_do_agendamento = "13:30"
+    
+    paciente_info = {
+        "nome": "Paciente Teste",
+        "data_nascimento": "10/10/1990",
+        "cpf": "123.456.789-00",
+        "telefone": "11999999999",
+        "tipo_atendimento": "Consulta"
+    }
+    
     tipo_de_atendimento = "Consulta"
     
     resultado = schedule_appointment(
         medico_para_agendar,
         data_do_agendamento,
         horario_do_agendamento,
-        cpf,
+        paciente_info,
         tipo_de_atendimento
     )
     print(resultado)
