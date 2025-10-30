@@ -23,6 +23,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # - Limpa o cache do apt no final para reduzir o tamanho da imagem
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    curl \
     wget \
     gnupg \
     locales \
@@ -49,7 +50,7 @@ COPY pyproject.toml uv.lock* .python-version* ./
 
 # Instala as dependências do projeto usando uv
 # O --system instala no ambiente global do container, o que é comum em Docker
-RUN /root/.local/bin/uv sync --system
+RUN uv sync --system
 
 # Copia o restante do código da aplicação para o diretório de trabalho /app
 COPY . .
