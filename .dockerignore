@@ -1,0 +1,72 @@
+# ===================================
+# Python / FastAPI .dockerignore
+# ===================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Dependency and build artifacts
+*.egg-info/
+*.egg
+build/
+dist/
+pip-wheel-metadata/
+
+# PyInstaller
+*.spec
+
+# Test / coverage files
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+htmlcov/
+
+# Editor / IDE config
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# OS / system files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files (keep secrets out of image)
+.env.local
+.env.*
+!.env.example  # Keep example env file if you have one
+
+# Git / version control
+.git/
+.gitignore
+.gitattributes
+
+# Docker / compose / other infra
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Cache and temp data
+__pypackages__/
+.cache/
+.mypy_cache/
+.pyre/
+.pytype/
+tmp/
+temp/
+
