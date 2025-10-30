@@ -20,10 +20,10 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     
     options = Options()
     options.add_argument("--lang=pt-BR")
-    # options.add_argument("--headless=new")
-    # options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
-    # options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
-    # options.add_argument("--window-size=1920,1080")
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
+    options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
+    options.add_argument("--window-size=1920,1080")
     
     prefs = {
         "profile.default_content_setting_values.notifications": 0
@@ -38,22 +38,41 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
     
     try: 
+        driver.set_page_load_timeout(30)
+        
         wait = WebDriverWait(driver, 30) 
         
         print(f"Navigating to: {URL}")
         driver.get(URL)
 
-        print("Waiting for page to load...")
-        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        print("Aguardando o campo 'usuario' (ID: usuario)...")
+        try:
+            user = wait.until(
+                EC.presence_of_element_located((By.ID, "usuario"))
+            )
+            print("Campo 'usuario' encontrado. Preenchendo...")
+            user.send_keys(USER)
+        
+        except TimeoutException:
+            print("ERRO: Timeout! O campo 'usuario' não apareceu na página de login.")
+            raise 
 
-        user = wait.until(EC.element_to_be_clickable((By.ID, "usuario")))
-        user.send_keys(USER)
-
-        password  = wait.until(EC.presence_of_element_located((By.ID, "senha")))
+        password = wait.until(EC.presence_of_element_located((By.ID, "senha")))
         password.send_keys(PASSWORD)
+
+        print("Logging in...")
    
-        login = wait.until(EC.element_to_be_clickable((By.ID, "btLogin")))
-        login.click()
+        try:
+            login_button = wait.until(
+                EC.presence_of_element_located((By.ID, "btLogin"))
+            )
+            print("Botão 'btLogin' encontrado. Forçando clique via JavaScript...")
+            
+            driver.execute_script("arguments[0].click();", login_button)
+
+        except TimeoutException:
+            print("ERRO: Timeout! Não foi possível encontrar 'btLogin' (nem pela presença).")
+            raise 
 
         try:
             print("Waiting for modal...")
@@ -97,18 +116,6 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         print(f"Profissional selecionado: {medico}")
 
         dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
-        # dateAppointment.clear()
-        # dateAppointment.send_keys(data_desejada)
-
-        # appointments_grid = wait.until(
-        #     EC.element_to_be_clickable((By.ID, "abaAgenda"))
-        # )
-        # appointments_grid.click()
-
-        # dateAppointment.send_keys(Keys.TAB) 
-        # print(f"Data selecionada: {data_desejada}") 
-
-        # print(f"Validando se o horário {horario_desejado} está disponível...")
 
         try:
             data_obj = datetime.strptime(data_desejada, '%d/%m/%Y')

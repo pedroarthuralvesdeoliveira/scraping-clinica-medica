@@ -24,10 +24,10 @@ def verify_doctors_calendar(
 
     options = Options()
     options.add_argument("--lang=pt-BR")
-    # options.add_argument("--headless=new")
-    # options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
-    # options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
-    # options.add_argument("--window-size=1920,1080")
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
+    options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
+    options.add_argument("--window-size=1920,1080")
     
     prefs = {
          "profile.default_content_setting_values.notifications": 0
@@ -63,8 +63,17 @@ def verify_doctors_calendar(
 
         print("Logging in...")
    
-        login = wait.until(EC.element_to_be_clickable((By.ID, "btLogin")))
-        login.click()
+        try:
+            login_button = wait.until(
+                EC.presence_of_element_located((By.ID, "btLogin"))
+            )
+            print("Botão 'btLogin' encontrado. Forçando clique via JavaScript...")
+            
+            driver.execute_script("arguments[0].click();", login_button)
+
+        except TimeoutException:
+            print("ERRO: Timeout! Não foi possível encontrar 'btLogin' (nem pela presença).")
+            raise 
 
         print("Waiting for modal...")
 
