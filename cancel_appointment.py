@@ -1,5 +1,6 @@
-import time
 import os
+import time
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -23,8 +24,8 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     # options.add_argument("--window-size=1920,1080")
 
     prefs = {
-         "profile.default_content_setting_values.notifications": 0
-         }
+        "profile.default_content_setting_values.notifications": 0
+    }
     options.add_experimental_option("prefs", prefs)
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -93,12 +94,51 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
 
         print(f"Profissional selecionado: {medico}")
 
-        dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
-        dateAppointment.clear()
-        dateAppointment.send_keys(data_desejada)
-        dateAppointment.send_keys(Keys.TAB)
+        dateAppointment = wait.until(EC.presence_of_element_located((By.ID, "dataAgenda")))
+
+        try:
+            data_obj = datetime.strptime(data_desejada, '%d/%m/%Y')
+            
+            data_formatada_para_input = data_obj.strftime('%Y-%m-%d')
+            
+            print(f"Convertendo data {data_desejada} para {data_formatada_para_input} (ISO) para envio via JS.")
+            
+        except ValueError:
+            print(f"ERRO: Não foi possível converter a data '{data_desejada}'.")
+            return {"status": "error", "message": "Data em formato inválido."}
+
+        try:
+            driver.execute_script("arguments[0].value = arguments[1];", dateAppointment, data_formatada_para_input)
+            print("Valor da data injetado via JavaScript.")
+
+            print("Disparando 'onblur' via JavaScript para carregar a grade...")
+            driver.execute_script("arguments[0].dispatchEvent(new Event('blur'));", dateAppointment)
+
+        except Exception as e:
+            print(f"Erro ao tentar injetar data com JavaScript: {e}")
+            driver.save_screenshot("debug_data_javascript_falhou.png")
+            return {"status": "error", "message": "Falha ao definir data com JavaScript."}
+
+        valor_final_campo = dateAppointment.get_attribute("value")
+        print(f"Valor final no campo de data (value property): '{valor_final_campo}' (Esperado: '{data_formatada_para_input}')")
         
-        print(f"Data selecionada: {data_desejada}")
+        if valor_final_campo != data_formatada_para_input:
+             print("ALERTA: O valor final no campo não corresponde ao esperado após injeção de JS!")
+        
+        print(f"Data selecionada (original): {data_desejada}")
+
+        try:
+              wait.until(
+                  EC.any_of(
+                      EC.presence_of_element_located((By.XPATH, "//tr[@id='070000']")),
+                      EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-info') and contains(text(), 'expediente')]"))
+                  )
+              )
+              print("Grade de horários ou mensagem de expediente (re)carregada após JS.")
+        except TimeoutException:
+              print("ERRO: A grade não recarregou após a injeção de JS. Verifique o screenshot.")
+              driver.save_screenshot("debug_data_nao_recarregou_js.png")
+              return {"status": "error", "message": "Falha ao definir a data e recarregar a grade."}
 
         horario_id = horario_desejado.replace(":", "") + "00"
 
@@ -118,9 +158,12 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
             desmarcado_button.click()
             print("Botão 'Desmarcado' clicado.")
 
+            time.sleep(1)
+
             reason_input = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input.bootbox-input-text"))
             )
+            reason_input.click()
             reason_input.send_keys("não disse o motivo")
             print("Motivo do cancelamento preenchido.")
 

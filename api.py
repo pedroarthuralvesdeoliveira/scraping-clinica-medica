@@ -28,7 +28,7 @@ class CancelPayload(BaseModel):
     nome_paciente: str
 
 
-API_KEY = os.environ.get("API_KEY", "SUA_CHAVE_SECRETA_MUITO_FORTE") 
+API_KEY = os.environ.get("API_KEY", "53051fe441b9cdf8d8c8bbf663475acc87ae399b75723eb0a4e265f48c6de646") 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def get_api_key(key: str = Security(api_key_header)):
@@ -111,7 +111,6 @@ def get_task_status(task_id: str):
 
     response = {
         "task_id": task_id,
-        "status": task_result.status, 
         "result": None
     }
 
