@@ -49,7 +49,7 @@ COPY pyproject.toml uv.lock* .python-version* ./
 
 # Instala as dependências do projeto usando uv
 # O --system instala no ambiente global do container, o que é comum em Docker
-RUN uv sync --system
+RUN /root/.local/bin/uv sync --system
 
 # Copia o restante do código da aplicação para o diretório de trabalho /app
 COPY . .
