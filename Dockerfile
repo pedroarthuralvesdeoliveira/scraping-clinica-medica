@@ -71,4 +71,4 @@ ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 
 # Command to start FastAPI using uvicorn
 # Assuming your main app is defined in `api.py` as `app = FastAPI()`
-CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
