@@ -46,11 +46,15 @@ RUN apt-get update && \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Copia os arquivos de definição de dependências e versão do Python
-COPY pyproject.toml uv.lock* .python-version* ./
+COPY pyproject.toml .python-version* ./
 
 # Instala as dependências do projeto usando uv
 # O --system instala no ambiente global do container, o que é comum em Docker
-RUN uv sync --locked
+# RUN uv sync --locked
+
+# Instala as dependências definidas no pyproject.toml no ambiente global
+# Esta é a forma correta de "instalação no sistema" com uv
+RUN /root/.local/bin/uv pip install .
 
 # Copia o restante do código da aplicação para o diretório de trabalho /app
 COPY . .
