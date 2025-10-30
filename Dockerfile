@@ -1,67 +1,74 @@
-# Dockerfile
-
-# Use uma imagem base do Python 3.13 (verifique se a versão slim atende, senão use a completa)
-# Usando bookworm como base Debian para pacotes mais recentes
+# Use an official lightweight Python image
 FROM python:3.13-slim-bookworm
 
-# Evita prompts interativos durante a instalação de pacotes
-ENV DEBIAN_FRONTEND=noninteractive \
-    # Define o diretório de trabalho
-    WORKDIR=/app \
-    # Adiciona o diretório de scripts do uv ao PATH
-    PATH="/root/.local/bin:${PATH}" \
-    # Configurações de idioma/localidade (pode ajudar com caracteres especiais)
-    LANG=pt_BR.UTF-8 \
-    LANGUAGE=pt_BR:pt:en \
-    LC_ALL=pt_BR.UTF-8
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Instala dependências do sistema:
-# - wget e gnupg: para adicionar o repositório do Chrome
-# - google-chrome-stable: o próprio navegador Chrome
-# - locales: para gerar a localidade pt_BR.UTF-8
-# - fonts-ipafont-gothic: fontes adicionais que podem ser necessárias para renderizar páginas
-# - Limpa o cache do apt no final para reduzir o tamanho da imagem
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
+# Set the working directory inside the container
+WORKDIR /code
+
+# Install system dependencies (optional but useful)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
+    curl \
     gnupg \
-    locales \
-    fonts-ipafont-gothic \
-    && \
-    # Configura a localidade pt_BR
-    echo "pt_BR.UTF-8 UTF-8" >> /etc/locale.gen && \
-    locale-gen pt_BR.UTF-8 && \
-    # Adiciona o repositório do Google Chrome
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' && \
-    # Instala o Chrome
-    apt-get update && \
-    apt-get install -y google-chrome-stable --no-install-recommends && \
-    # Limpa o cache
-    apt-get purge -y --auto-remove wget gnupg && \
+    unzip \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    ca-certificates \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Google Chrome (stable)
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && apt-get install -y google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# Instala o uv (gerenciador de pacotes e venv)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install uv (modern Python package manager)
+RUN pip install uv
 
-# Copia os arquivos de definição de dependências e versão do Python
-COPY pyproject.toml .python-version* ./
+# Copy dependency files first for caching
+COPY pyproject.toml uv.lock* README.md ./
 
-# Instala as dependências definidas no pyproject.toml no ambiente global
-# Esta é a forma correta de "instalação no sistema" com uv
-RUN /root/.local/bin/uv pip install . --system
+# Install dependencies (using uv for speed)
+RUN uv sync --frozen
 
-# Instala as dependências do projeto usando uv
-# O --system instala no ambiente global do container, o que é comum em Docker
-# RUN uv sync --locked
-
-# Copia o restante do código da aplicação para o diretório de trabalho /app
+# Copy the rest of your source code
 COPY . .
 
-# Expõe a porta que a API FastAPI usará (se este container for a API)
+# Expose FastAPI default port
 EXPOSE 8000
 
-# O CMD será definido/sobrescrito na configuração do serviço no Coolify
-# Exemplo para API: CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
-# Exemplo para Worker: CMD ["celery", "-A", "tasks", "worker", "--loglevel=info", "-c", "1"]
+# Set environment variable for Chrome path
+ENV CHROME_BIN=/usr/bin/google-chrome
+ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
+
+# Command to start FastAPI using uvicorn
+# Assuming your main app is defined in `api.py` as `app = FastAPI()`
+CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
