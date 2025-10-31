@@ -301,8 +301,8 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
             botao_salvar = wait.until(
                 EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
             )
-            botao_salvar.click()
-            print("Clicando em Salvar...")
+            driver.execute_script("arguments[0].click();", botao_salvar)
+            print("Clicando em 'Salvar' via JS...")
             
             print("Agendamento concluído com sucesso!")
             return {"status": "success", "message": "Agendamento realizado."}
@@ -331,8 +331,8 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         botao_salvar = wait.until(
             EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
         )
-        botao_salvar.click()
-        print("Clicando em Salvar...")
+        driver.execute_script("arguments[0].click();", botao_salvar)
+        print("Clicando em 'Salvar' via JS...")
         
         print("Agendamento concluído com sucesso!")
         return {"status": "success", "message": "Agendamento realizado."}
