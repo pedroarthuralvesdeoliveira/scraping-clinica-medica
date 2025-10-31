@@ -106,7 +106,7 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         medico_limpo = medico.strip()
         search_field.send_keys(medico_limpo)
         
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and normalize-space()='{medico_limpo}']"
+        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(normalize-space(), '{medico_limpo}')]"
         
         medico_option = wait.until(
             EC.element_to_be_clickable((By.XPATH, medico_option_xpath))

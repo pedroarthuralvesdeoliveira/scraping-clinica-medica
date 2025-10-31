@@ -110,7 +110,7 @@ def verify_doctors_calendar(
         medico_limpo = medico.strip()
         search_field.send_keys(medico_limpo)
         
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and normalize-space()='{medico_limpo}']"
+        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(normalize-space(), '{medico_limpo}')]"
         
         medico_option = wait.until(
             EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
@@ -169,14 +169,22 @@ def verify_doctors_calendar(
 
             horario_id = horario_desejado.replace(":", "") + "00" 
 
+            try:
+                horario_tr_xpath = f"//tr[@id='{horario_id}']"
+                driver.find_element(By.XPATH, horario_tr_xpath)
+                print(f"Linha de horário {horario_desejado} (ID: {horario_id}) encontrada na grade.")
+            except NoSuchElementException:
+                print(f"ERRO: A linha de horário {horario_desejado} (ID: {horario_id}) não existe na grade para este dia.")
+                return {"status": "unavailable", "message": f"Horário {horario_desejado} não existe na grade para {data_desejada}."}
+
             elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
             elementos_filhos = driver.find_elements(By.XPATH, elementos_filhos_xpath)
 
             if len(elementos_filhos) > 0:
-                print(f"O horário {horario_desejado} do dia {data_desejada} está OCUPADO.")
+                print(f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} está OCUPADO.")
                 return {"status": "unavailable", "message": f"Horário {horario_desejado} em {data_desejada} indisponível."}
             else:
-                print(f"O horário {horario_desejado} do dia {data_desejada} está DISPONÍVEL.")
+                print(f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} está DISPONÍVEL para o profissional {medico}.")
                 return {"status": "available", "message": f"Horário {horario_desejado} em {data_desejada} disponível."}
 
         elif data_desejada:
