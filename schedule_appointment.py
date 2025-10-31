@@ -1,11 +1,11 @@
-import time
 import os 
+from datetime import datetime
 from selenium import webdriver 
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
 
 from selenium.webdriver.common.keys import Keys
@@ -20,14 +20,14 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     
     options = Options()
     options.add_argument("--lang=pt-BR")
-    # options.add_argument("--headless=new")
-    # options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
-    # options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
-    # options.add_argument("--window-size=1920,1080")
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
+    options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
+    options.add_argument("--window-size=1920,1080")
     
     prefs = {
-         "profile.default_content_setting_values.notifications": 0
-         }
+        "profile.default_content_setting_values.notifications": 0
+    }
     options.add_experimental_option("prefs", prefs)
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -38,24 +38,41 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
     
     try: 
+        driver.set_page_load_timeout(30)
+        
         wait = WebDriverWait(driver, 30) 
         
         print(f"Navigating to: {URL}")
         driver.get(URL)
 
-        print("Waiting for page to load...")
-        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        print("Aguardando o campo 'usuario' (ID: usuario)...")
+        try:
+            user = wait.until(
+                EC.presence_of_element_located((By.ID, "usuario"))
+            )
+            print("Campo 'usuario' encontrado. Preenchendo...")
+            user.send_keys(USER)
+        
+        except TimeoutException:
+            print("ERRO: Timeout! O campo 'usuario' não apareceu na página de login.")
+            raise 
 
-        user = wait.until(EC.element_to_be_clickable((By.ID, "usuario")))
-        user.send_keys(USER)
-
-        password  = wait.until(EC.presence_of_element_located((By.ID, "senha")))
+        password = wait.until(EC.presence_of_element_located((By.ID, "senha")))
         password.send_keys(PASSWORD)
-   
-        login = wait.until(EC.element_to_be_clickable((By.ID, "btLogin")))
-        login.click()
 
-        (3) 
+        print("Logging in...")
+   
+        try:
+            login_button = wait.until(
+                EC.presence_of_element_located((By.ID, "btLogin"))
+            )
+            print("Botão 'btLogin' encontrado. Forçando clique via JavaScript...")
+            
+            driver.execute_script("arguments[0].click();", login_button)
+
+        except TimeoutException:
+            print("ERRO: Timeout! Não foi possível encontrar 'btLogin' (nem pela presença).")
+            raise 
 
         try:
             print("Waiting for modal...")
@@ -98,34 +115,57 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
 
         print(f"Profissional selecionado: {medico}")
 
-        (2) 
-
         dateAppointment = wait.until(EC.element_to_be_clickable((By.ID, "dataAgenda")))
-        dateAppointment.clear()
-        dateAppointment.send_keys(data_desejada)
 
-        (3)
+        try:
+            data_obj = datetime.strptime(data_desejada, '%d/%m/%Y')
+            
+            data_formatada_para_input = data_obj.strftime('%Y-%m-%d')
+            
+            print(f"Convertendo data {data_desejada} para {data_formatada_para_input} (ISO) para envio via JS.")
+            
+        except ValueError:
+            print(f"ERRO: Não foi possível converter a data '{data_desejada}'.")
+            return {"status": "error", "message": "Data em formato inválido."}
 
-        appointments_grid = wait.until(
-            EC.element_to_be_clickable((By.ID, "abaAgenda"))
-        )
-        appointments_grid.click()
+        try:
+            driver.execute_script("arguments[0].value = arguments[1];", dateAppointment, data_formatada_para_input)
+            print("Valor da data injetado via JavaScript.")
 
-        (3)
+            print("Disparando 'onblur' via JavaScript para carregar a grade...")
+            driver.execute_script("arguments[0].dispatchEvent(new Event('blur'));", dateAppointment)
 
-        dateAppointment.send_keys(Keys.TAB) 
-        print(f"Data selecionada: {data_desejada}") 
+        except Exception as e:
+            print(f"Erro ao tentar injetar data com JavaScript: {e}")
+            driver.save_screenshot("debug_data_javascript_falhou.png")
+            return {"status": "error", "message": "Falha ao definir data com JavaScript."}
 
-        print(f"Validando se o horário {horario_desejado} está disponível...")
+        valor_final_campo = dateAppointment.get_attribute("value")
+        print(f"Valor final no campo de data (value property): '{valor_final_campo}' (Esperado: '{data_formatada_para_input}')")
+        
+        if valor_final_campo != data_formatada_para_input:
+             print("ALERTA: O valor final no campo não corresponde ao esperado após injeção de JS!")
+        
+        print(f"Data selecionada (original): {data_desejada}")
+
+        try:
+              wait.until(
+                  EC.any_of(
+                      EC.presence_of_element_located((By.XPATH, "//tr[@id='070000']")),
+                      EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-info') and contains(text(), 'expediente')]"))
+                  )
+              )
+              print("Grade de horários ou mensagem de expediente (re)carregada após JS.")
+        except TimeoutException:
+              print("ERRO: A grade não recarregou após a injeção de JS. Verifique o screenshot.")
+              driver.save_screenshot("debug_data_nao_recarregou_js.png")
+              return {"status": "error", "message": "Falha ao definir a data e recarregar a grade."}
         
         try:
             horario_id = horario_desejado.replace(":", "") + "00"
         except Exception as e:
             print(f"Erro ao formatar o horário: {e}")
             raise ValueError("Formato de horário inválido. Esperado HH:MM")
-
-        
-        (3) 
 
         try:
             horario_tr_xpath = f"//tr[@id='{horario_id}']"
@@ -134,8 +174,6 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         except TimeoutException:
             print(f"Erro: A linha de horário {horario_desejado} (ID: {horario_id}) não foi encontrada.")
             return {"status": "error", "message": f"Horário {horario_desejado} não existe na grade."}
-
-        (5) 
 
         try:
             elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
@@ -176,12 +214,8 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         )
         select_type_of_search.click()
 
-        (2)
-
         select = Select(select_type_of_search)
         select.select_by_value("cpf")
-
-        (2)
 
         cpf_paciente = paciente_info['cpf']
         campo_pesquisa_paciente = wait.until(
@@ -208,23 +242,16 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
             )
             criar_paciente_button.click()
 
-            (2)
-
             # Nome
             nome_paciente_input = wait.until(EC.element_to_be_clickable((By.ID, "nomePaciente")))
             nome_paciente_input.clear()
             nome_paciente_input.send_keys(paciente_info['nome'])
             print(f"Nome preenchido: {paciente_info['nome']}")
 
-            (2)
-
             # Data de Nascimento
             data_nascimento_input = wait.until(EC.element_to_be_clickable((By.ID, "dataNascimentoAgenda")))
             data_nascimento_input.send_keys(paciente_info['data_nascimento'])
             print(f"Data de nascimento preenchida: {paciente_info['data_nascimento']}")
-
-            (2)
-
             
             # Telefone
             telefone_paciente_input = wait.until(EC.element_to_be_clickable((By.ID, "numeroTelefone")))
@@ -237,8 +264,6 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
                 driver.execute_script("arguments[0].value = arguments[1];", telefone_paciente_input, telefone_val)
                 driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", telefone_paciente_input)
             print(f"Telefone preenchido: {paciente_info["telefone"]}")
-
-            (4)
 
             # CPF
             cpf_selector = "input[id='cpfPaciente'][type='text']"
@@ -261,8 +286,6 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
                 EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
             )
 
-            (2)
-
             tipo_atendimento_limpo = tipo_atendimento.strip()
             search_field_tipo.send_keys(tipo_atendimento_limpo)
 
@@ -275,20 +298,14 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
 
             print(f"Tipo de Atendimento selecionado: {tipo_atendimento}")
 
-            (2) 
-
             botao_salvar = wait.until(
                 EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
             )
             botao_salvar.click()
             print("Clicando em Salvar...")
-
-            (5) 
             
             print("Agendamento concluído com sucesso!")
             return {"status": "success", "message": "Agendamento realizado."}
-
-        (2) 
 
         select_tipo_clickable = wait.until(
             EC.element_to_be_clickable((By.ID, "select2-tipoAtendimento-container"))
@@ -311,15 +328,11 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
 
         print(f"Tipo de Atendimento selecionado: {tipo_atendimento}")
 
-        (2) 
-
         botao_salvar = wait.until(
             EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
         )
         botao_salvar.click()
         print("Clicando em Salvar...")
-
-        (5) 
         
         print("Agendamento concluído com sucesso!")
         return {"status": "success", "message": "Agendamento realizado."}
