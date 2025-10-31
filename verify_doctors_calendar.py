@@ -185,7 +185,7 @@ def verify_doctors_calendar(
                 return {"status": "unavailable", "message": f"Horário {horario_desejado} em {data_desejada} indisponível."}
             else:
                 print(f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} está DISPONÍVEL para o profissional {medico}.")
-                return {"status": "available", "message": f"Horário {horario_desejado} em {data_desejada} disponível."}
+                return {"status": "success", "message": f"Horário {horario_desejado} em {data_desejada} disponível."}
 
         elif data_desejada:
             try:
@@ -249,7 +249,7 @@ def verify_doctors_calendar(
                 if slot_id and (int(slot_id) >= horario_inicial_id) and (int(slot_id) <= horario_final_id):
                     available_times.append(slot_tr.find_element(By.TAG_NAME, "a").text)
             
-            return {"status": "available_slots", "date": data_desejada, "slots": available_times}
+            return {"status": "success", "date": data_desejada, "slots": available_times}
         else: 
             for i in range(365): 
                 check_date_str_display = current_date.strftime("%d/%m/%Y")
@@ -308,7 +308,7 @@ def verify_doctors_calendar(
                         if available_slots:
                             next_time = available_slots[0].text
                             print(f"Próximo horário disponível encontrado: {next_time} em {check_date_str_display}")
-                            return {"status": "found", "date": check_date_str_display, "time": next_time}
+                            return {"status": "success", "date": check_date_str_display, "time": next_time}
                         else:
                             print(f"Nenhum horário vago encontrado em {check_date_str_display}.")
                     except TimeoutException:
