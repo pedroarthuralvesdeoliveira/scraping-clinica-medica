@@ -1,20 +1,25 @@
 # ---- Estágio 1: Base (Python + uv) ----
-# Usamos um "apelido" 'as base' para este estágio
-FROM python:3.13-slim-bookworm as base
+# Usamos um "apelido" 'AS base' para este estágio
+FROM python:3.13-slim-bookworm AS base
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /code
 RUN pip install uv
 
 # ---- Estágio 2: Dependências Python ----
 # Instala TODAS as dependências Python em uma pasta separada
-FROM base as python_deps
+FROM base AS python_deps
 COPY pyproject.toml uv.lock* README.md ./
-# Instala as dependências em uma pasta que podemos copiar depois
-RUN uv sync --frozen --into /opt/venv
+
+# --- CORREÇÃO AQUI ---
+# 1. Cria o virtual environment
+RUN uv venv /opt/venv
+# 2. Ativa o venv e instala as dependências DENTRO dele
+RUN . /opt/venv/bin/activate && uv sync --frozen
+# --- FIM DA CORREÇÃO ---
 
 # ---- Estágio 3: Imagem Final da API (Leve) ----
 # Este é o nosso alvo 'api'
-FROM base as api
+FROM base AS api
 # Copia apenas o .venv com as dependências prontas
 COPY --from=python_deps /opt/venv /opt/venv
 # Copia o código-fonte
@@ -29,7 +34,7 @@ CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # ---- Estágio 4: Imagem Final do Worker (Pesada) ----
 # Este é o nosso alvo 'worker'
-FROM base as worker
+FROM base AS worker
 # 1. Instala as dependências de sistema (apt-get) para o Chrome
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
