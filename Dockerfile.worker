@@ -1,0 +1,4 @@
+FROM Dockerfile.base
+
+# Command to start Celery
+CMD ["uv", "run", "-A", "celery_worker.celery", "worker", "--loglevel=info", "-c", "1"] 
