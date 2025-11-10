@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.security import APIKeyHeader
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from celery.result import AsyncResult
 import os
@@ -28,7 +29,7 @@ class CancelPayload(BaseModel):
     nome_paciente: str
 
 
-API_KEY = os.environ.get("API_KEY", "53051fe441b9cdf8d8c8bbf663475acc87ae399b75723eb0a4e265f48c6de646") 
+API_KEY = os.environ.get("API_KEY", "SUA_CHAVE_DE_API") 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def get_api_key(key: str = Security(api_key_header)):
@@ -107,21 +108,30 @@ def get_task_status(task_id: str):
     """
     Consulta o backend do Celery (Redis) para obter o status e o resultado de uma tarefa.
     """
-    task_result = AsyncResult(task_id, app=celery)
+    task_result_obj: AsyncResult = AsyncResult(task_id, app=celery)
 
     response = {
         "task_id": task_id,
+        "status": task_result_obj.status,
         "result": None
     }
 
-    if task_result.successful():
-        response["result"] = task_result.get() 
-    elif task_result.failed():
-        try:
-            response["result"] = str(task_result.info) if task_result.info else "Falha sem detalhes adicionais."
-        except Exception:
-            response["result"] = "Erro ao obter detalhes da falha."
-    return response
+    if task_result_obj.ready():
+        result = task_result_obj.get()
+        response["result"] = result
+
+        if isinstance(result, dict) and result.get("status") == "unavailable":
+            return JSONResponse(status_code=409, content=response)
+        elif isinstance(result, dict) and result.get("status") == "error":
+            return JSONResponse(status_code=500, content=response) 
+
+    elif task_result_obj.status == "PENDING":
+        response["result"] = "Tarefa ainda não iniciada."
+    elif task_result_obj.status == "STARTED":
+        response["result"] = "Tarefa em execução."
+
+    return JSONResponse(status_code=200, content=response)
+
 
 if __name__ == "__main__":
     print("Iniciando API de automação em http://localhost:8000")
