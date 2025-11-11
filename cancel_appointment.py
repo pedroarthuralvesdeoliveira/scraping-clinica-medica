@@ -30,15 +30,25 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     driver.maximize_window()
 
+    is_endoclin_of = False
+
     URL = os.environ.get("SOFTCLYN_URL")
+    LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
+
+    URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
+
+    if "ANDRÉ A. S. BAGANHA" in medico or "JOAO R.C.MATOS" in medico: 
+        URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
+        is_endoclin_of = True
+
     USER = os.environ.get("SOFTCLYN_USER")
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
     
     try:
         wait = WebDriverWait(driver, 30)
         
-        print(f"Navigating to: {URL}")
-        driver.get(URL)
+        print(f"Navigating to: {URL_BASE}")
+        driver.get(URL_BASE)
 
         print("Waiting for page to load...")
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -83,6 +93,21 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
             print("No modal found or already closed, proceeding...")
         
         print("Iniciando fluxo de cancelamento...")
+
+        if is_endoclin_of:
+            menu = wait.until(EC.element_to_be_clickable((By.ID, "menuAtendimentoLi")))
+            menu.click()
+
+            print("Clicando em 'Agendamento' no menu...")
+
+            agendamento = wait.until(
+                EC.element_to_be_clickable((By.ID, "M1"))
+            )
+            agendamento.click()
+
+            print("Entrou na tela de agendamento.")
+
+            time.sleep(2)
         
         select_doctor_clickable = wait.until(
             EC.element_to_be_clickable((By.ID, "select2-medico-container"))

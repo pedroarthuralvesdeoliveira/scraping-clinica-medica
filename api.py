@@ -21,6 +21,7 @@ class SchedulePayload(BaseModel):
     cpf: str
     telefone: str
     tipo_atendimento: str
+    convenio: str | None = None
 
 class CancelPayload(BaseModel):
     medico: str
@@ -55,7 +56,8 @@ def api_schedule(payload: SchedulePayload):
         "data_nascimento": payload.data_nascimento,
         "cpf": payload.cpf,
         "telefone": payload.telefone,
-        "tipo_atendimento": payload.tipo_atendimento
+        "tipo_atendimento": payload.tipo_atendimento,
+        "convenio": payload.convenio
     }
 
     task = schedule_appointment_task.delay(

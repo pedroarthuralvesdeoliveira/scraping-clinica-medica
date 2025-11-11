@@ -1,4 +1,5 @@
 import os 
+import time
 from datetime import datetime
 from selenium import webdriver 
 from selenium.webdriver.chrome.service import Service
@@ -12,6 +13,58 @@ from selenium.webdriver.common.keys import Keys
 
 from webdriver_manager.chrome import ChromeDriverManager
 
+def _select_convenio_digitando(driver, wait, convenio_nome):
+    """
+    Seleciona um convênio digitando o nome no campo select2 de 'convênio'.
+    """
+    print(f"Selecionando convênio: {convenio_nome}")
+
+    select_convenio_clickable = wait.until(
+        EC.element_to_be_clickable((By.ID, "select2-convenio-container"))
+    )
+    select_convenio_clickable.click()
+
+    search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
+    search_field = wait.until(
+        EC.element_to_be_clickable((By.XPATH, search_field_xpath))
+    )
+
+    search_field.clear()
+    search_field.send_keys(convenio_nome.strip())
+    time.sleep(1)  
+
+    option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{convenio_nome.upper()}')]"
+    option = wait.until(
+        EC.element_to_be_clickable((By.XPATH, option_xpath))
+    )
+
+    option.click()
+    print(f"Convênio '{convenio_nome}' selecionado com sucesso.")
+
+
+def _select_tipo_atendimento(driver, wait, tipo_atendimento):
+    print(f"Selecionando tipo de atendimento: {tipo_atendimento}")
+    select_tipo_clickable = wait.until(
+        EC.element_to_be_clickable((By.ID, "select2-tipoAtendimento-container"))
+    )
+    select_tipo_clickable.click()
+
+    search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
+    search_field = wait.until(
+        EC.element_to_be_clickable((By.XPATH, search_field_xpath))
+    )
+
+    search_field.clear()
+    search_field.send_keys(tipo_atendimento.strip())
+    time.sleep(1)  
+
+    option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{tipo_atendimento.upper()}')]"
+    option = wait.until(
+        EC.element_to_be_clickable((By.XPATH, option_xpath))
+    )
+
+    option.click()
+    print(f"Tipo de Atendimento '{tipo_atendimento}' selecionado com Enter.")
 
 def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, horario_desejado: str | None = None, tipo_atendimento: str | None = "Primeira vez"):
     """
@@ -33,7 +86,17 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     driver.maximize_window()
 
+    is_endoclin_of = False
+
     URL = os.environ.get("SOFTCLYN_URL")
+    LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
+
+    URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
+
+    if "ANDRÉ A. S. BAGANHA" in medico or "JOAO R.C.MATOS" in medico: 
+        URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
+        is_endoclin_of = True
+    
     USER = os.environ.get("SOFTCLYN_USER")
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
     
@@ -42,8 +105,8 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         
         wait = WebDriverWait(driver, 30) 
         
-        print(f"Navigating to: {URL}")
-        driver.get(URL)
+        print(f"Navigating to: {URL_BASE}")
+        driver.get(URL_BASE)
 
         print("Aguardando o campo 'usuario' (ID: usuario)...")
         try:
@@ -94,7 +157,22 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
             print("No modal found or already closed, proceeding...")        
         
         print("Iniciando fluxo de agendamento...")
-        
+
+        if is_endoclin_of:
+            menu = wait.until(EC.element_to_be_clickable((By.ID, "menuAtendimentoLi")))
+            menu.click()
+
+            print("Clicando em 'Agendamento' no menu...")
+
+            agendamento = wait.until(
+                EC.element_to_be_clickable((By.ID, "M1"))
+            )
+            agendamento.click()
+
+            print("Entrou na tela de agendamento.")
+
+            time.sleep(2)  
+       
         select_doctor_clickable = wait.until(
             EC.element_to_be_clickable((By.ID, "select2-medico-container"))
         )
@@ -242,97 +320,59 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
             )
             criar_paciente_button.click()
 
-            # Nome
-            nome_paciente_input = wait.until(EC.element_to_be_clickable((By.ID, "nomePaciente")))
-            nome_paciente_input.clear()
-            nome_paciente_input.send_keys(paciente_info['nome'])
-            print(f"Nome preenchido: {paciente_info['nome']}")
-
             # Data de Nascimento
             data_nascimento_input = wait.until(EC.element_to_be_clickable((By.ID, "dataNascimentoAgenda")))
             data_nascimento_input.send_keys(paciente_info['data_nascimento'])
             print(f"Data de nascimento preenchida: {paciente_info['data_nascimento']}")
             
             # Telefone
-            telefone_paciente_input = wait.until(EC.element_to_be_clickable((By.ID, "numeroTelefone")))
-            telefone_paciente_input.click()  
-            telefone_paciente_input.clear()  
-            telefone_paciente_input.send_keys(paciente_info["telefone"])
-            if telefone_paciente_input.text == "":
-                telefone_paciente_input = wait.until(EC.presence_of_element_located((By.ID, "numeroTelefone")))
-                telefone_val = paciente_info["telefone"]
-                driver.execute_script("arguments[0].value = arguments[1];", telefone_paciente_input, telefone_val)
-                driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", telefone_paciente_input)
-            print(f"Telefone preenchido: {paciente_info["telefone"]}")
+            telefone_input = wait.until(EC.presence_of_element_located((By.ID, "numeroTelefone")))
+            telefone_val = paciente_info["telefone"]
+            driver.execute_script("arguments[0].value = arguments[1];", telefone_input, telefone_val)
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", telefone_input)
+            print(f"Telefone preenchido: {paciente_info['telefone']}")
 
             # CPF
             cpf_selector = "input[id='cpfPaciente'][type='text']"
-            
-            cpf_paciente_input = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, cpf_selector))
-            )
-            
-            cpf_paciente_input.click()
-            cpf_paciente_input.clear() 
-            cpf_paciente_input.send_keys(paciente_info["cpf"])
+            cpf_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, cpf_selector)))
+            driver.execute_script("arguments[0].value = arguments[1];", cpf_input, paciente_info["cpf"])
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", cpf_input)
             print(f"CPF preenchido: {paciente_info['cpf']}")
 
-            select_tipo_clickable = wait.until(
-                EC.element_to_be_clickable((By.ID, "select2-tipoAtendimento-container"))
-            )
-            select_tipo_clickable.click()
+            _select_convenio_digitando(driver, wait, paciente_info['convenio'])
 
-            search_field_tipo = wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
-            )
+            _select_tipo_atendimento(driver, wait, tipo_atendimento)
 
-            tipo_atendimento_limpo = tipo_atendimento.strip()
-            search_field_tipo.send_keys(tipo_atendimento_limpo)
+            print("Corrigindo o campo 'Nome' como última ação antes de salvar...")
+            nome_paciente_input = wait.until(EC.presence_of_element_located((By.ID, "nomePaciente")))
+            nome_val = paciente_info["nome"]
+            driver.execute_script("arguments[0].value = arguments[1];", nome_paciente_input, nome_val)
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", nome_paciente_input)
+            print(f"Nome final definido como: {nome_val}")
 
-            tipo_option_xpath = f"//li[contains(@class, 'select2-results__option') and normalize-space()='{tipo_atendimento_limpo}']"
+            time.sleep(5)
             
-            tipo_option = wait.until(
-                EC.element_to_be_clickable((By.XPATH, tipo_option_xpath))
-            )
-            tipo_option.click()
-
-            print(f"Tipo de Atendimento selecionado: {tipo_atendimento}")
-
             botao_salvar = wait.until(
                 EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
             )
             driver.execute_script("arguments[0].click();", botao_salvar)
             print("Clicando em 'Salvar' via JS...")
-            
-            print("Agendamento concluído com sucesso!")
-            return {"status": "success", "message": "Agendamento realizado."}
 
-        select_tipo_clickable = wait.until(
-            EC.element_to_be_clickable((By.ID, "select2-tipoAtendimento-container"))
-        )
-        select_tipo_clickable.click()
+            time.sleep(2)  # Espera para garantir que o paciente foi salvo
+            return {"status": "success", "message": "Agendamento de novo paciente realizado."}
 
-        search_field_tipo = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
-        )
         
-        tipo_atendimento_limpo = tipo_atendimento.strip()
-        search_field_tipo.send_keys(tipo_atendimento_limpo)
+        if paciente_info['convenio']:
+            _select_convenio_digitando(driver, wait, paciente_info['convenio'])
 
-        tipo_option_xpath = f"//li[contains(@class, 'select2-results__option') and normalize-space()='{tipo_atendimento_limpo}']"
-        
-        tipo_option = wait.until(
-            EC.element_to_be_clickable((By.XPATH, tipo_option_xpath))
-        )
-        tipo_option.click()
-
-        print(f"Tipo de Atendimento selecionado: {tipo_atendimento}")
+        _select_tipo_atendimento(driver, wait, tipo_atendimento)
 
         botao_salvar = wait.until(
             EC.element_to_be_clickable((By.ID, "btSalvarAgenda"))
         )
         driver.execute_script("arguments[0].click();", botao_salvar)
         print("Clicando em 'Salvar' via JS...")
+        time.sleep(2)  # Espera para garantir que o paciente foi salvo
         
         print("Agendamento concluído com sucesso!")
         return {"status": "success", "message": "Agendamento realizado."}
@@ -371,8 +411,8 @@ if __name__ == '__main__':
     resultado = schedule_appointment(
         medico_para_agendar,
         data_do_agendamento,
-        horario_do_agendamento,
         paciente_info,
-        tipo_de_atendimento
+        horario_do_agendamento,
+        tipo_de_atendimento,
     )
     print(resultado)
