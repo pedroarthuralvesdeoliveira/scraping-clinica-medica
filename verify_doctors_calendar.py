@@ -46,11 +46,15 @@ def verify_doctors_calendar(
     URL = os.environ.get("SOFTCLYN_URL")
     LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
 
+    medicos_endoclin_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+
     URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
 
-    if "ANDRÉ A. S. BAGANHA" in medico or "JOAO R.C.MATOS" in medico: 
-        URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
-        is_endoclin_of = True
+    for dr in medicos_endoclin_of:
+        if medico.upper() in dr.upper():
+            URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
+            is_endoclin_of = True   
+            break
 
     USER = os.environ.get("SOFTCLYN_USER")
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
@@ -136,8 +140,7 @@ def verify_doctors_calendar(
         medico_limpo = medico.strip()
         search_field.send_keys(medico_limpo)
         
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(normalize-space(), '{medico_limpo}')]"
-        
+        medico_option_xpath = f"//li[contains(@class, 'select2-results__option')]"
         medico_option = wait.until(
             EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
         )

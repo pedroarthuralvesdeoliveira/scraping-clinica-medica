@@ -91,11 +91,15 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     URL = os.environ.get("SOFTCLYN_URL")
     LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
 
+    medicos_endoclin_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+
     URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
 
-    if "ANDRÉ A. S. BAGANHA" in medico or "JOAO R.C.MATOS" in medico: 
-        URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
-        is_endoclin_of = True
+    for dr in medicos_endoclin_of:
+        if medico.upper() in dr.upper():
+            URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
+            is_endoclin_of = True   
+            break
     
     USER = os.environ.get("SOFTCLYN_USER")
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
