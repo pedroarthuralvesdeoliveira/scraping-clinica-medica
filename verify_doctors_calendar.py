@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -40,7 +41,21 @@ def verify_doctors_calendar(
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     driver.maximize_window()
 
+    is_endoclin_of = False
+
     URL = os.environ.get("SOFTCLYN_URL")
+    LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
+
+    medicos_endoclin_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+
+    URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
+
+    for dr in medicos_endoclin_of:
+        if medico.upper() in dr.upper():
+            URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
+            is_endoclin_of = True   
+            break
+
     USER = os.environ.get("SOFTCLYN_USER")
     PASSWORD = os.environ.get("SOFTCLYN_PASS")
     
@@ -49,8 +64,8 @@ def verify_doctors_calendar(
 
         wait = WebDriverWait(driver, WAIT_TIME_LONG) 
         
-        print(f"Navigating to: {URL}")
-        driver.get(URL)
+        print(f"Navigating to: {URL_BASE}")
+        driver.get(URL_BASE)
 
         print("Waiting for page to load...")
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -98,6 +113,21 @@ def verify_doctors_calendar(
             print("No modal found or already closed, proceeding...")
         
         print("Iniciando fluxo de verificação de agenda...")
+
+        if is_endoclin_of:
+            menu = wait.until(EC.element_to_be_clickable((By.ID, "menuAtendimentoLi")))
+            menu.click()
+
+            print("Clicando em 'Agendamento' no menu...")
+
+            agendamento = wait.until(
+                EC.element_to_be_clickable((By.ID, "M1"))
+            )
+            agendamento.click()
+
+            print("Entrou na tela de agendamento.")
+
+            time.sleep(2)
         
         select_doctor_clickable = wait.until(
             EC.element_to_be_clickable((By.ID, "select2-medico-container"))
@@ -110,8 +140,7 @@ def verify_doctors_calendar(
         medico_limpo = medico.strip()
         search_field.send_keys(medico_limpo)
         
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(normalize-space(), '{medico_limpo}')]"
-        
+        medico_option_xpath = f"//li[contains(@class, 'select2-results__option')]"
         medico_option = wait.until(
             EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
         )

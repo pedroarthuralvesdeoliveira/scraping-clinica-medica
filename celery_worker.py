@@ -18,7 +18,13 @@ celery = Celery (
 )
 
 @celery.task(name='schedule_appointment_task')
-def schedule_appointment_task(medico: str, data_desejada: str, paciente_info: dict, horario_desejado: str | None = None, tipo_atendimento: str | None = "Primeira vez"):
+def schedule_appointment_task(
+    medico: str, 
+    data_desejada: str, 
+    paciente_info: dict, 
+    horario_desejado: str | None = None, 
+    tipo_atendimento: str | None = "Primeira vez",
+):
     print(f"Worker recebeu tarefa de agendamento para: {paciente_info.get('nome')}")
     result = schedule_task_func(medico, data_desejada, paciente_info, horario_desejado, tipo_atendimento)
     print(f"Worker finalizou tarefa de agendamento. Resultado: {result}")
