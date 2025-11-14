@@ -4,6 +4,7 @@ from datetime import datetime
 from selenium import webdriver 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.chrome.service import Service 
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
@@ -68,6 +69,12 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     """
     Executa a automação de agendamento no SoftClyn.
     """
+
+    service = Service(
+        executable_path="/usr/bin/chromedriver",
+        log_output="/code/chromedriver.log",  # Salva o log na pasta /code
+        service_args=["--verbose"]            # Ativa o modo verbose
+    )
     
     options = Options()
     options.binary_location = "/usr/bin/google-chrome"
@@ -83,7 +90,13 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     }
     options.add_experimental_option("prefs", prefs)
     
-    driver = webdriver.Chrome(options=options)
+    print("Iniciando driver com logging verbose...")
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
+        print("Driver iniciado com sucesso.")
+    except Exception as e:
+        print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")
+        raise e
 
     is_endoclin_of = False
 

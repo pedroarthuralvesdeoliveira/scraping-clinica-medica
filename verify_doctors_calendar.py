@@ -20,6 +20,12 @@ def verify_doctors_calendar(
     """
     Verifica a disponibilidade da agenda de um médico.
     """
+
+    service = Service(
+        executable_path="/usr/bin/chromedriver",
+        log_output="/code/chromedriver.log",  # Salva o log na pasta /code
+        service_args=["--verbose"]            # Ativa o modo verbose
+    )
     
 
     options = Options()
@@ -38,8 +44,14 @@ def verify_doctors_calendar(
     
     WAIT_TIME_SHORT = 5
     WAIT_TIME_LONG = 30 
-    
-    driver = webdriver.Chrome(options=options)
+
+    print("Iniciando driver com logging verbose...")    
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
+        print("Driver iniciado com sucesso.")
+    except Exception as e:
+        print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")
+        raise e
 
     is_endoclin_of = False
 
