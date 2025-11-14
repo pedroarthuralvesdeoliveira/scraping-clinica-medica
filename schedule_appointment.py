@@ -2,7 +2,6 @@ import os
 import time
 from datetime import datetime
 from selenium import webdriver 
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
@@ -10,10 +9,6 @@ from selenium.common.exceptions import TimeoutException, ElementClickIntercepted
 from selenium.webdriver.chrome.options import Options
 
 from selenium.webdriver.common.keys import Keys
-
-os.environ["SELENIUM_MANAGER_DISABLED"] = "1"  
-
-service = Service("/usr/bin/chromedriver")
 
 
 def _select_convenio_digitando(driver, wait, convenio_nome):
@@ -86,7 +81,7 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     }
     options.add_experimental_option("prefs", prefs)
     
-    driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(options=options)
 
     is_endoclin_of = False
 

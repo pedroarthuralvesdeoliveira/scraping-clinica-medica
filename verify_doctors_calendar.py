@@ -10,10 +10,6 @@ from selenium.common.exceptions import TimeoutException, ElementClickIntercepted
 from selenium.webdriver.chrome.options import Options
 from datetime import timedelta
 
-os.environ["SELENIUM_MANAGER_DISABLED"] = "1"  
-
-service = Service("/usr/bin/chromedriver")
-
 def verify_doctors_calendar(
         medico: str, 
         data_desejada: str | None = None,
@@ -41,7 +37,7 @@ def verify_doctors_calendar(
     WAIT_TIME_SHORT = 5
     WAIT_TIME_LONG = 30 
     
-    driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(options=options)
 
     is_endoclin_of = False
 
