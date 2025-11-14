@@ -38,8 +38,7 @@ def verify_doctors_calendar(
     WAIT_TIME_SHORT = 5
     WAIT_TIME_LONG = 30 
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.maximize_window()
+    driver = webdriver.Chrome(options=options)
 
     is_endoclin_of = False
 

@@ -83,8 +83,7 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     }
     options.add_experimental_option("prefs", prefs)
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.maximize_window()
+    driver = webdriver.Chrome(options=options)
 
     is_endoclin_of = False
 

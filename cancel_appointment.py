@@ -2,11 +2,10 @@ import os
 import time
 from datetime import datetime
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoAlertPresentException
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, 
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -27,8 +26,7 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     }
     options.add_experimental_option("prefs", prefs)
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.maximize_window()
+    driver = webdriver.Chrome(options=options)
 
     is_endoclin_of = False
 

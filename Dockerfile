@@ -69,9 +69,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libxss1 \
     libxtst6 \
+    libgbm1 \
+    libu2f-udev \
     ca-certificates \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
+
 
 # 2. Instala o Google Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
@@ -89,4 +92,4 @@ ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 # 6. Seta o PATH para usar o .venv
 ENV PATH="/opt/venv/bin:$PATH"
 # 7. Define o comando do Worker
-CMD ["uv", "run", "celery", "-A", "celery_worker.celery", "worker", "--loglevel=info", "-c", "1"]
+CMD ["uv", "run", "celery", "-A", "celery_worker.celery", "worker", "--loglevel=info", "-c", "8", "--max-tasks-per-child=50"]
