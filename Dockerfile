@@ -54,4 +54,4 @@ ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV SELENIUM_MANAGER_DISABLED=1 
 
-CMD ["uv", "run", "celery", "-A", "celery_worker.celery", "worker", "--loglevel=info", "-c", "8", "--max-tasks-per-child=50"]
+CMD ["uv", "run", "celery", "-A", "celery_worker.celery", "worker", "--loglevel=info", "-c", "4", "--max-tasks-per-child=50"]
