@@ -14,10 +14,12 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     """
 
     options = Options()
+    options.binary_location = "/usr/bin/google-chrome"
     options.add_argument("--lang=pt-BR")
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
     options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
+    options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
 
     prefs = {
