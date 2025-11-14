@@ -69,15 +69,8 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     """
     Executa a automação de agendamento no SoftClyn.
     """
-
-    service = Service(
-        executable_path="/usr/bin/chromedriver",
-        log_output="/code/chromedriver.log",  # Salva o log na pasta /code
-        service_args=["--verbose"]            # Ativa o modo verbose
-    )
     
     options = Options()
-    options.binary_location = "/usr/bin/google-chrome"
     options.add_argument("--lang=pt-BR")
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
@@ -92,7 +85,7 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     
     print("Iniciando driver com logging verbose...")
     try:
-        driver = webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Chrome(options=options)
         print("Driver iniciado com sucesso.")
     except Exception as e:
         print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")

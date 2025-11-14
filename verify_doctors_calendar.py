@@ -2,7 +2,6 @@ import os
 import time
 from datetime import datetime
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -19,17 +18,9 @@ def verify_doctors_calendar(
 ):
     """
     Verifica a disponibilidade da agenda de um médico.
-    """
-
-    service = Service(
-        executable_path="/usr/bin/chromedriver",
-        log_output="/code/chromedriver.log",  # Salva o log na pasta /code
-        service_args=["--verbose"]            # Ativa o modo verbose
-    )
-    
+    """    
 
     options = Options()
-    options.binary_location = "/usr/bin/google-chrome"
     options.add_argument("--lang=pt-BR")
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
@@ -47,7 +38,7 @@ def verify_doctors_calendar(
 
     print("Iniciando driver com logging verbose...")    
     try:
-        driver = webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Chrome(options=options)
         print("Driver iniciado com sucesso.")
     except Exception as e:
         print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")

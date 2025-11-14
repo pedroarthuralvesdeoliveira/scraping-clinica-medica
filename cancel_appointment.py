@@ -14,14 +14,7 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     Cancels an appointment in SoftClyn.
     """
 
-    service = Service(
-        executable_path="/usr/bin/chromedriver",
-        log_output="/code/chromedriver.log",  # Salva o log na pasta /code
-        service_args=["--verbose"]            # Ativa o modo verbose
-    )
-
     options = Options()
-    options.binary_location = "/usr/bin/google-chrome"
     options.add_argument("--lang=pt-BR")
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
