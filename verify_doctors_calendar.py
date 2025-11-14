@@ -8,8 +8,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from datetime import timedelta
+
+os.environ["SELENIUM_MANAGER_DISABLED"] = "1"  
+
+service = Service("/usr/bin/chromedriver")
 
 def verify_doctors_calendar(
         medico: str, 
@@ -38,7 +41,7 @@ def verify_doctors_calendar(
     WAIT_TIME_SHORT = 5
     WAIT_TIME_LONG = 30 
     
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(service=service, options=options)
 
     is_endoclin_of = False
 

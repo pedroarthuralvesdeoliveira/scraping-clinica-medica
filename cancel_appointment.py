@@ -4,10 +4,14 @@ from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+
+os.environ["SELENIUM_MANAGER_DISABLED"] = "1"  
+
+service = Service("/usr/bin/chromedriver")
 
 def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     """
@@ -26,7 +30,7 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     }
     options.add_experimental_option("prefs", prefs)
     
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(service=service, options=options)
 
     is_endoclin_of = False
 

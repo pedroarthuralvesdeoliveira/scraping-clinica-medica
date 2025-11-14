@@ -11,7 +11,10 @@ from selenium.webdriver.chrome.options import Options
 
 from selenium.webdriver.common.keys import Keys
 
-from webdriver_manager.chrome import ChromeDriverManager
+os.environ["SELENIUM_MANAGER_DISABLED"] = "1"  
+
+service = Service("/usr/bin/chromedriver")
+
 
 def _select_convenio_digitando(driver, wait, convenio_nome):
     """
@@ -83,7 +86,7 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
     }
     options.add_experimental_option("prefs", prefs)
     
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(service=service, options=options)
 
     is_endoclin_of = False
 
