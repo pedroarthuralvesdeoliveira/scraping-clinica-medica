@@ -44,6 +44,7 @@ RUN CHROME_VERSION=$(curl -s https://googlechromelabs.github.io/chrome-for-testi
     \
     && wget -O chromedriver.zip "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip" \
     && unzip chromedriver.zip -d /opt && rm chromedriver.zip \
+    && chmod +x /opt/chromedriver-linux64/chromedriver \
     && ln -s /opt/chromedriver-linux64/chromedriver /usr/bin/chromedriver
 
 COPY --from=python_deps /opt/venv /opt/venv
