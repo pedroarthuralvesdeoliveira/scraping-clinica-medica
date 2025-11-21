@@ -98,10 +98,10 @@ def verify_doctors_calendar(
         try:
             modal_wait = WebDriverWait(driver, 5)
             print("Waiting for modal...")
-            modal = modal_wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'bootbox')))
+            modal = modal_wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'modal')))
             print("Modal found, waiting for OK button...")
             ok_button = modal_wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-bb-handler="ok"]'))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-dismiss="modal"]'))
             )
             try:
                 ok_button.click()

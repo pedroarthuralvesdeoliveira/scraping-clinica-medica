@@ -148,10 +148,10 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
 
         try:
             print("Waiting for modal...")
-            modal = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'bootbox')))
+            modal = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'modal')))
             print("Modal found, waiting for OK button...")
             ok_button = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-bb-handler="ok"]'))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-dismiss="modal"]'))
             )   
             try:
                 ok_button.click()

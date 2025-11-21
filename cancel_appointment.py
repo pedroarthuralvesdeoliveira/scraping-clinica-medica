@@ -29,7 +29,7 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     
     print("Iniciando driver com logging verbose...")
     try:
-        driver = webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Chrome(options=options)
         print("Driver iniciado com sucesso.")
     except Exception as e:
         print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")
@@ -85,10 +85,10 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
 
         try:
             print("Waiting for modal...")
-            modal = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'bootbox')))
+            modal = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'modal')))
             print("Modal found, waiting for OK button...")
             ok_button = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-bb-handler="ok"]'))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-dismiss="modal"]'))
             )
             try:
                 ok_button.click()
