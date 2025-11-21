@@ -8,6 +8,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     """
@@ -127,10 +130,11 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
         search_field = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
         )
-        medico_limpo = medico.strip()
+        
+        medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
         search_field.send_keys(medico_limpo)
         
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(normalize-space(), '{medico_limpo}')]"
+        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(normalize-space(.), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{medico_limpo.upper()}')]"
         
         medico_option = wait.until(
             EC.element_to_be_clickable((By.XPATH, medico_option_xpath))

@@ -8,6 +8,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from datetime import timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def verify_doctors_calendar(
         medico: str, 
@@ -22,11 +25,11 @@ def verify_doctors_calendar(
 
     options = Options()
     options.add_argument("--lang=pt-BR")
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
+    # options.add_argument("--headless=new")
+    # options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
     options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
     options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
+    # options.add_argument("--window-size=1920,1080")
     
     prefs = {
          "profile.default_content_setting_values.notifications": 0
@@ -140,10 +143,11 @@ def verify_doctors_calendar(
         search_field = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
         )
-        medico_limpo = medico.strip()
+
+        medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
         search_field.send_keys(medico_limpo)
         
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option')]"
+        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(normalize-space(.), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{medico_limpo.upper()}')]"
         medico_option = wait.until(
             EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
         )
@@ -371,15 +375,17 @@ def verify_doctors_calendar(
     
 
 if __name__ == '__main__':
-    medico_para_verificar = "Danielle Braga - Médico endocrinologista e metabologista "
+    # medico_para_verificar = "Danielle Braga - Médico endocrinologista e metabologista"
+    medico_para_verificar = "Dr. Wilson Scappini Jr"
+
     
     # Exemplo 1: Verificar um horário específico
-    # resultado = verify_doctors_calendar(medico_para_verificar, data_desejada="24/10/2025", horario_desejado="14:00")
+    # resultado = verify_doctors_calendar(medico_para_verificar, data_desejada="28/11/2025", horario_desejado="09:00")
     # print(resultado)
 
     # Exemplo 2: Verificar todos os horários disponíveis em um dia (e intervalo)
-    # resultado = verify_doctors_calendar(medico_para_verificar, data_desejada="24/10/2025", horario_inicial="10:00", horario_final="18:00")
-    #print(resultado)
+    resultado = verify_doctors_calendar(medico_para_verificar, data_desejada="28/11/2025", horario_inicial="09:00", horario_final="18:00")
+    print(resultado)
 
     # Exemplo 3: Procurar o próximo horário livre (sem data)
     # resultado = verify_doctors_calendar(medico_para_verificar)
