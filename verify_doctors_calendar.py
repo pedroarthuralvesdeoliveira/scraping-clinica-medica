@@ -3,12 +3,14 @@ import time
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from datetime import timedelta
 from dotenv import load_dotenv
+from selenium.webdriver.support.wait import T
 
 load_dotenv()
 
@@ -17,18 +19,20 @@ def verify_doctors_calendar(
         data_desejada: str | None = None,
         horario_desejado: str | None = None,
         horario_inicial: str | None = None,
-        horario_final: str | None = None
-):
+        horario_final: str | None = None):
     """
     Verifica a disponibilidade da agenda de um médico.
     """    
 
     options = Options()
     options.add_argument("--lang=pt-BR")
-    options.add_argument("--headless=new")
+    # options.add_argument("--headless=new")
     options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
     options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
     options.add_argument("--disable-gpu")
+    # options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-logging")
     
     prefs = {
          "profile.default_content_setting_values.notifications": 0
@@ -95,8 +99,6 @@ def verify_doctors_calendar(
             print("ERRO: Timeout! Não foi possível encontrar 'btLogin' (nem pela presença).")
             raise 
 
-        print("Waiting for modal...")
-
         try:
             modal_wait = WebDriverWait(driver, 5)
             print("Waiting for modal...")
@@ -133,26 +135,44 @@ def verify_doctors_calendar(
             print("Entrou na tela de agendamento.")
 
             time.sleep(2)
-        
-        select_doctor_clickable = wait.until(
-            EC.element_to_be_clickable((By.ID, "select2-medico-container"))
-        )
-        select_doctor_clickable.click()
-        
-        search_field = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
-        )
+            
+        try:
+            select_doctor_clickable = wait.until(
+                EC.element_to_be_clickable((By.ID, "select2-medico-container"))
+            )
+            select_doctor_clickable.click()
+            
+            search_field = wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//input[@class='select2-search__field']"))
+            )
+            print("Campo de busca do Select2 encontrado.")
 
-        medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
-        search_field.send_keys(medico_limpo)
-        
-        medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(normalize-space(.), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{medico_limpo.upper()}')]"
-        medico_option = wait.until(
-            EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
-        )
-        medico_option.click()
-
-        print(f"Profissional selecionado: {medico}")
+            medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
+            search_field.send_keys(medico_limpo)
+            
+            time.sleep(1.5)
+            
+            print(f"Nome '{medico_limpo}' digitado no campo de busca.")
+            
+            search_field.send_keys(Keys.ENTER)
+            
+            time.sleep(3) 
+                    
+            medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(text(), '{medico_limpo}')]"            
+            medico_option = wait.until(
+                EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
+            )
+            print("Opção do médico encontrada no Select2.")
+            
+            medico_option.click()
+            print(f"Tecla ENTER enviada ao campo de busca. Médico '{medico_limpo}' selecionado.")
+            
+            print(f"Médico '{medico_limpo}' selecionado com sucesso usando ENTER.")
+        except TimeoutException:
+            print("ERRO: O medico não foi encontrado a tempo.")
+        except Exception as e:
+            print(f"Ocorreu outro erro: {e}")
+            raise
 
         if data_desejada and horario_desejado: 
             try:
@@ -375,7 +395,7 @@ def verify_doctors_calendar(
 
 if __name__ == '__main__':
     # medico_para_verificar = "Danielle Braga - Médico endocrinologista e metabologista"
-    medico_para_verificar = "Dr. Wilson Scappini Jr"
+    medico_para_verificar = "Dr. Antônio Adolfo Coelho Oliveira"
 
     
     # Exemplo 1: Verificar um horário específico
