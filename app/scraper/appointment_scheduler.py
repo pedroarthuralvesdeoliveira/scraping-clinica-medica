@@ -1,4 +1,3 @@
-import os 
 import time
 from datetime import datetime
 from selenium import webdriver 
@@ -8,11 +7,8 @@ from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
-from dotenv import load_dotenv
-
 from selenium.webdriver.common.keys import Keys
 
-load_dotenv()
 
 
 def _select_convenio_digitando(driver, wait, convenio_nome):
@@ -43,7 +39,6 @@ def _select_convenio_digitando(driver, wait, convenio_nome):
     option.click()
     print(f"Convênio '{convenio_nome}' selecionado com sucesso.")
 
-
 def _select_tipo_atendimento(driver, wait, tipo_atendimento):
     print(f"Selecionando tipo de atendimento: {tipo_atendimento}")
     select_tipo_clickable = wait.until(
@@ -70,7 +65,7 @@ def _select_tipo_atendimento(driver, wait, tipo_atendimento):
 
 def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, horario_desejado: str | None = None, tipo_atendimento: str | None = "Primeira vez"):
     """
-    Executa a automação de agendamento no SoftClyn.
+    Executa a automação de agendamento.
     """
     
     options = Options()
@@ -94,19 +89,19 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")
         raise e
 
-    is_endoclin_of = False
+    is_SOFTCLYN_of = False
 
     URL = os.environ.get("SOFTCLYN_URL")
     LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
 
-    medicos_endoclin_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+    medicos_SOFTCLYN_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
 
-    URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
+    URL_BASE = f"{URL}/SOFTCLYN_ouro/{LOGIN}"
 
-    for dr in medicos_endoclin_of:
+    for dr in medicos_SOFTCLYN_of:
         if medico.upper() in dr.upper():
-            URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
-            is_endoclin_of = True   
+            URL_BASE = f"{URL}/SOFTCLYN_of/{LOGIN}"
+            is_SOFTCLYN_of = True   
             break
     
     USER = os.environ.get("SOFTCLYN_USER")
@@ -170,7 +165,7 @@ def schedule_appointment(medico: str, data_desejada: str, paciente_info: dict, h
         
         print("Iniciando fluxo de agendamento...")
 
-        if is_endoclin_of:
+        if is_SOFTCLYN_of:
             menu = wait.until(EC.element_to_be_clickable((By.ID, "menuAtendimentoLi")))
             menu.click()
 

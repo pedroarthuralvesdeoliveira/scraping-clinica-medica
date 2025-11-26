@@ -1,20 +1,18 @@
-import os
 import time
+from ..core.dependencies import get_settings
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.chrome.service import Service 
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
-from dotenv import load_dotenv
 
-load_dotenv()
+settings = get_settings()
 
 def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
     """
-    Cancels an appointment in SoftClyn.
+    Cancels an appointment in SOFTCLYN.
     """
 
     options = Options()
@@ -39,23 +37,23 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
         # Force o raise para que o Celery pegue o erro
         raise e
 
-    is_endoclin_of = False
+    is_SOFTCLYN_of = False
 
-    URL = os.environ.get("SOFTCLYN_URL")
-    LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
+    URL = settings.softclyn_url
+    LOGIN = settings.softclyn_login_page
 
-    medicos_endoclin_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+    medicos_SOFTCLYN_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
 
-    URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
+    URL_BASE = f"{URL}/{settings.softclyn_empresa}_ouro/{LOGIN}"
 
-    for dr in medicos_endoclin_of:
+    for dr in medicos_SOFTCLYN_of:
         if medico.upper() in dr.upper():
-            URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
-            is_endoclin_of = True   
+            URL_BASE = f"{URL}/{settings.softclyn_empresa}_of/{LOGIN}"
+            is_SOFTCLYN_of = True   
             break
 
-    USER = os.environ.get("SOFTCLYN_USER")
-    PASSWORD = os.environ.get("SOFTCLYN_PASS")
+    USER = settings.softclyn_user
+    PASSWORD = settings.softclyn_pass
     
     try:
         wait = WebDriverWait(driver, 30)
@@ -107,7 +105,7 @@ def cancel_appointment(medico, data_desejada, horario_desejado, nome_paciente):
         
         print("Iniciando fluxo de cancelamento...")
 
-        if is_endoclin_of:
+        if is_SOFTCLYN_of:
             menu = wait.until(EC.element_to_be_clickable((By.ID, "menuAtendimentoLi")))
             menu.click()
 

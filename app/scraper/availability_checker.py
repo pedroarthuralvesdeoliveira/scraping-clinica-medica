@@ -1,18 +1,15 @@
-import os
 import time
-from datetime import datetime
+from ..core.dependencies import get_settings
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException, ElementClickInterceptedException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
-from datetime import timedelta
-from dotenv import load_dotenv
-from selenium.webdriver.support.wait import T
 
-load_dotenv()
+settings = get_settings()
 
 def verify_doctors_calendar(
         medico: str, 
@@ -25,12 +22,11 @@ def verify_doctors_calendar(
     """    
 
     options = Options()
-    options.add_argument("--lang=pt-BR")
-    # options.add_argument("--headless=new")
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox") # Necessário para rodar como root/em containers
     options.add_argument("--disable-dev-shm-usage") # Necessário para alguns ambientes Linux
     options.add_argument("--disable-gpu")
-    # options.add_argument("--window-size=1920,1080")
+    options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-logging")
     
@@ -50,23 +46,23 @@ def verify_doctors_calendar(
         print(f"ERRO IMEDIATO AO INICIAR O DRIVER: {e}")
         raise e
 
-    is_endoclin_of = False
+    is_SOFTCLYN_of = False
 
-    URL = os.environ.get("SOFTCLYN_URL")
-    LOGIN = os.environ.get("SOFTCLYN_LOGIN_PAGE")
+    URL = settings.softclyn_url
+    LOGIN = settings.softclyn_login_page
 
-    medicos_endoclin_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+    medicos_SOFTCLYN_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
 
-    URL_BASE = f"{URL}/endoclin_ouro/{LOGIN}"
+    URL_BASE = f"{URL}/{settings.softclyn_empresa}_ouro/{LOGIN}"
 
-    for dr in medicos_endoclin_of:
+    for dr in medicos_SOFTCLYN_of:
         if medico.upper() in dr.upper():
-            URL_BASE = f"{URL}/endoclin_of/{LOGIN}"
-            is_endoclin_of = True   
+            URL_BASE = f"{URL}/{settings.softclyn_empresa}_of/{LOGIN}"
+            is_SOFTCLYN_of = True   
             break
 
-    USER = os.environ.get("SOFTCLYN_USER")
-    PASSWORD = os.environ.get("SOFTCLYN_PASS")
+    USER: str = settings.softclyn_user
+    PASSWORD: str = settings.softclyn_pass
     
     try:
         driver.set_page_load_timeout(30)
@@ -121,7 +117,7 @@ def verify_doctors_calendar(
         
         print("Iniciando fluxo de verificação de agenda...")
 
-        if is_endoclin_of:
+        if is_SOFTCLYN_of:
             menu = wait.until(EC.element_to_be_clickable((By.ID, "menuAtendimentoLi")))
             menu.click()
 
@@ -148,26 +144,35 @@ def verify_doctors_calendar(
             print("Campo de busca do Select2 encontrado.")
 
             medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
+                   
+            print(f"Digitando '{medico_limpo}'...")
             search_field.send_keys(medico_limpo)
             
-            time.sleep(1.5)
+            time.sleep(2)
             
             print(f"Nome '{medico_limpo}' digitado no campo de busca.")
+    
+            try:
+                search_field.send_keys(Keys.ENTER)
+                print("Enviado ENTER para selecionar.")
+            except Exception:
+                pass
+    
+            try:
+                medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(text(), '{medico_limpo}')]"
+                
+                medico_option = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
+                )
+                medico_option.click()
+                print(f"Clicado na opção: {medico_limpo}")
+            except TimeoutException:
+                print("Opção não encontrada ou já selecionada pelo ENTER.")
+            except StaleElementReferenceException:
+                medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(text(), '{medico_limpo}')]"
+                medico_option = driver.find_element(By.XPATH, medico_option_xpath)
+                medico_option.click()
             
-            search_field.send_keys(Keys.ENTER)
-            
-            time.sleep(3) 
-                    
-            medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(text(), '{medico_limpo}')]"            
-            medico_option = wait.until(
-                EC.element_to_be_clickable((By.XPATH, medico_option_xpath))
-            )
-            print("Opção do médico encontrada no Select2.")
-            
-            medico_option.click()
-            print(f"Tecla ENTER enviada ao campo de busca. Médico '{medico_limpo}' selecionado.")
-            
-            print(f"Médico '{medico_limpo}' selecionado com sucesso usando ENTER.")
         except TimeoutException:
             print("ERRO: O medico não foi encontrado a tempo.")
         except Exception as e:
@@ -293,7 +298,7 @@ def verify_doctors_calendar(
             horario_inicial_id = int((horario_inicial or "07:00").replace(":", "") + "00")
             horario_final_id = int((horario_final or "19:30").replace(":", "") + "00")
 
-            elementos_filhos_xpath = f"//tr[@class='ui-droppable' and normalize-space(td[2]) = '' and not(td[2]/*)]"
+            elementos_filhos_xpath = "//tr[@class='ui-droppable' and normalize-space(td[2]) = '' and not(td[2]/*)]"
             elementos_filhos = driver.find_elements(By.XPATH, elementos_filhos_xpath)   
 
             available_times = []
