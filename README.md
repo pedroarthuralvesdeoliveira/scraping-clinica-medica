@@ -65,14 +65,14 @@ Para iniciar a API, o worker Celery e o Redis (se não estiver rodando), você p
     ```
 2.  **Iniciar o Celery Worker:** Em um terminal separado:
     ```bash
-    uv run celery -A celery_worker.celery worker --loglevel=info -c 4 --max-tasks-per-child=50    ```
+    uv run celery -A app.worker.celery_app worker --loglevel=info -c 4    ```
 3.  **Iniciar a FastAPI:** Em outro terminal separado:
     ```bash
-    uvicorn api:app --host 0.0.0.0 --port 8000
+    uv run uvicorn app.api.main:app --reload
     ```
     Ou 
     ```bash
-    uv run api.py
+    uv run app.api.main.py
     ```
 
 ## Utilizando a API
