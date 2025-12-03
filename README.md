@@ -65,7 +65,7 @@ Para iniciar a API, o worker Celery e o Redis (se não estiver rodando), você p
     ```
 2.  **Iniciar o Celery Worker:** Em um terminal separado:
     ```bash
-    uv run celery -A app.worker.celery_app worker --loglevel=info -c 4    ```
+    uv run celery -A app.worker.celery_app worker --loglevel=info -c 4
 3.  **Iniciar a FastAPI:** Em outro terminal separado:
     ```bash
     uv run uvicorn app.api.main:app --reload
@@ -170,14 +170,30 @@ X-API-Key: SUA_CHAVE_DE_API
 ├── .gitignore
 ├── .python-version
 ├── Dockerfile
+├── pyproject.toml
 ├── README.md
-├── api.py                     # Define a API FastAPI e seus endpoints.
-├── cancel_appointment.py      # Lógica de scraping para cancelar agendamentos.
-├── celery_worker.py           # Configuração do Celery e definição das tarefas assíncronas.
-├── pyproject.toml             # Metadados do projeto e dependências Python.
-├── schedule_appointment.py    # Lógica de scraping para agendar novos compromissos.
-├── uv.lock                    # Gerenciamento de dependências com uv.
-└── verify_doctors_calendar.py # Lógica de scraping para verificar disponibilidade.
-├── .venv/                     # Ambiente virtual Python.
-└── __pycache__/               # Cache de bytecode do Python.
+├── uv.lock
+├── app/
+│   ├── api/
+│   │   ├── main.py
+│   │   ├── routes/
+│   │   │   ├── appointments.py
+│   │   │   └── health.py
+│   │   └── schemas/
+│   │       └── common.py
+│   ├── core/
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   ├── exceptions.py
+│   │   └── logging.py
+│   ├── scraper/
+│   │   ├── appointment_canceller.py
+│   │   ├── appointment_scheduler.py
+│   │   ├── availability_checker.py
+│   │   └── base.py
+│   └── worker/
+│       ├── celery_app.py
+│       └── tasks.py
+├── .git/
+└── .venv/
 ```
