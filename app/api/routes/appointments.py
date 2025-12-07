@@ -62,17 +62,8 @@ def api_check_availability(payload: VerifyPayload = Depends()):
     Ex: /availability?medico=Dr.Nome&data_desejada=25/10/2025&horario_desejado=14:00
     Ex: /availability?medico=Dr.Nome (para achar o próximo livre)
     """
-    print(f"API recebeu job de verificação para: {payload.medico}. Enfileirando...")
+    print(f"API recebeu job de verificação para: {payload.medico}. Enfileirando...")    
     
-    print(f"--- DEBUG ROUTE: Broker URL atual é: {celery.conf.broker_url} ---")
-    
-    # task = verify_doctors_calendar_task.delay( # type: ignore
-        # payload.medico,
-        # payload.data_desejada,
-        # payload.horario_desejado,
-        # payload.horario_inicial,
-        # payload.horario_final
-    # )
     task = celery.send_task(
         'verify_doctors_calendar_task',
         args=[
@@ -103,9 +94,7 @@ def get_task_status(task_id: str):
         result = task_result_obj.get()
         response["result"] = result
 
-        if isinstance(result, dict) and result.get("status") == "unavailable":
-            return JSONResponse(status_code=409, content=response)
-        elif isinstance(result, dict) and result.get("status") == "error":
+        if isinstance(result, dict) and result.get("status") == "error":
             return JSONResponse(status_code=500, content=response) 
 
     elif task_result_obj.status == "PENDING":
