@@ -16,7 +16,7 @@ COPY --from=python_deps /opt/venv /opt/venv
 COPY . .
 ENV PATH="/opt/venv/bin:$PATH"
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 
 FROM base AS worker
@@ -72,4 +72,4 @@ COPY . .
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-CMD ["uv", "run", "celery", "-A", "celery_worker.celery", "worker", "--loglevel=info", "-c", "4", "--max-tasks-per-child=50"]
+CMD ["uv", "run", "celery", "-A", "app.worker.celery_app:celery", "worker", "--loglevel=info", "-c", "4", "--max-tasks-per-child=50"]
