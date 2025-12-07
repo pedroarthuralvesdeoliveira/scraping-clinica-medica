@@ -93,9 +93,7 @@ def get_task_status(task_id: str):
     if task_result_obj.ready():
         result = task_result_obj.get()
         response["result"] = result
-
-        if isinstance(result, dict) and result.get("status") == "error":
-            return JSONResponse(status_code=500, content=response) 
+    
 
     elif task_result_obj.status == "PENDING":
         response["result"] = "Tarefa ainda não iniciada."
