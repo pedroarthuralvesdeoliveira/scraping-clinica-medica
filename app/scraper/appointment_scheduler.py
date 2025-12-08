@@ -4,7 +4,7 @@ from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
  
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 
 from app.scraper.base import Browser
@@ -96,7 +96,7 @@ class AppointmentScheduler(Browser):
         
             self._search_doctor(medico)
     
-            dateAppointment = self.find_element(By.ID, "dataAgenda")
+            dateAppointment = self.wait_for_element(By.ID, "dataAgenda")
     
             try:
                 data_obj = datetime.strptime(data_desejada, '%d/%m/%Y')
@@ -120,12 +120,13 @@ class AppointmentScheduler(Browser):
                 print(f"Erro ao tentar injetar data com JavaScript: {e}")
                 self.save_screenshot("debug_data_javascript_falhou.png")
                 return {"status": "error", "message": "Falha ao definir data com JavaScript."}
-    
-            valor_final_campo = dateAppointment.get_attribute("value")
-            print(f"Valor final no campo de data (value property): '{valor_final_campo}' (Esperado: '{data_formatada_para_input}')")
             
-            if valor_final_campo != data_formatada_para_input:
-                print("ALERTA: O valor final no campo não corresponde ao esperado após injeção de JS!")
+            if dateAppointment:
+                valor_final_campo = dateAppointment.get_attribute("value")
+                print(f"Valor final no campo de data (value property): '{valor_final_campo}' (Esperado: '{data_formatada_para_input}')")
+            
+                if valor_final_campo != data_formatada_para_input:
+                    print("ALERTA: O valor final no campo não corresponde ao esperado após injeção de JS!")
             
             print(f"Data selecionada (original): {data_desejada}")
     
@@ -139,17 +140,19 @@ class AppointmentScheduler(Browser):
     
             try:
                 horario_tr_xpath = f"//tr[@id='{horario_id}']"
-                self.find_element(By.XPATH, horario_tr_xpath)
+                self.wait_for_element(By.XPATH, horario_tr_xpath)
                 
             except TimeoutException:
                 print(f"Erro: A linha de horário {horario_desejado} (ID: {horario_id}) não foi encontrada.")
                 return {"status": "error", "message": f"Horário {horario_desejado} não existe na grade."}
+            except NoSuchElementException: 
+                return {"status": "error", "message": f"Horário {horario_desejado} não existe na grade."}
     
             try:
                 elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
-                elementos_filhos = self.find_elements(By.XPATH, elementos_filhos_xpath) 
+                elementos_filhos = self.wait_for_element(By.XPATH, elementos_filhos_xpath) 
     
-                if len(elementos_filhos) > 0:
+                if elementos_filhos and len(elementos_filhos) > 0:
                     print(f"Erro: O horário {horario_desejado} já está OCUPADO.")
                     return {"status": "error", "message": f"Horário {horario_desejado} indisponível."}
                 else:
@@ -163,7 +166,7 @@ class AppointmentScheduler(Browser):
             horario_xpath = f"//a[starts-with(@href, 'javascript:marcaHorarioAgenda') and normalize-space()='{horario_desejado}']"
     
             try:
-                horario_slot = self.find_element(By.XPATH, horario_xpath)
+                horario_slot = self.wait_for_element(By.XPATH, horario_xpath)
                 self.execute_script("arguments[0].click();", horario_slot)
                 
                 print(f"Horário selecionado (via JS): {horario_desejado}")
@@ -184,10 +187,10 @@ class AppointmentScheduler(Browser):
     
     
             cpf_paciente = paciente_info['cpf']
-            campo_pesquisa_paciente = (By.XPATH, "//input[@placeholder='Digite o Nome do Paciente para Pesquisar']")
-            campo_pesquisa_paciente_element = self.find_element(*campo_pesquisa_paciente)
-            campo_pesquisa_paciente_element.send_keys(cpf_paciente)
-            campo_pesquisa_paciente_element.send_keys(Keys.ENTER)
+            campo_pesquisa_paciente = self.wait_for_element(By.XPATH, "//input[@placeholder='Digite o Nome do Paciente para Pesquisar']")
+            if campo_pesquisa_paciente:
+                campo_pesquisa_paciente.send_keys(cpf_paciente)
+                campo_pesquisa_paciente.send_keys(Keys.ENTER)
             
             print(f"Pesquisando paciente: {cpf_paciente}")
     
@@ -208,13 +211,14 @@ class AppointmentScheduler(Browser):
                     criar_paciente_button.click()
     
                 # Data de Nascimento
-                data_nascimento_input = self.find_element(By.ID, "dataNascimentoAgenda")
-                data_nascimento_input.send_keys(paciente_info['data_nascimento'])
+                data_nascimento_input = self.wait_for_element(By.ID, "dataNascimentoAgenda")
+                if data_nascimento_input:
+                    data_nascimento_input.send_keys(paciente_info['data_nascimento'])
                 
                 print(f"Data de nascimento preenchida: {paciente_info['data_nascimento']}")
                 
                 # Telefone
-                telefone_input = self.find_element(By.ID, "numeroTelefone")
+                telefone_input = self.wait_for_element(By.ID, "numeroTelefone")
                 telefone_val = paciente_info["telefone"]
                 self.execute_script("arguments[0].value = arguments[1];", telefone_input, telefone_val)
                 self.execute_script("arguments[0].dispatchEvent(new Event('change'));", telefone_input)
@@ -223,7 +227,7 @@ class AppointmentScheduler(Browser):
     
                 # CPF
                 cpf_selector = "input[id='cpfPaciente'][type='text']"
-                cpf_input = self.find_element(By.CSS_SELECTOR, cpf_selector)
+                cpf_input = self.wait_for_element(By.CSS_SELECTOR, cpf_selector)
                 self.execute_script("arguments[0].value = arguments[1];", cpf_input, paciente_info["cpf"])
                 self.execute_script("arguments[0].dispatchEvent(new Event('change'));", cpf_input)
                 
@@ -235,7 +239,7 @@ class AppointmentScheduler(Browser):
     
                 print("Corrigindo o campo 'Nome' como última ação antes de salvar...")
                 
-                nome_paciente_input = self.find_element(By.ID, "nomePaciente")
+                nome_paciente_input = self.wait_for_element(By.ID, "nomePaciente")
                 nome_val = paciente_info["nome"]
                 self.execute_script("arguments[0].value = arguments[1];", nome_paciente_input, nome_val)
                 self.execute_script("arguments[0].dispatchEvent(new Event('change'));", nome_paciente_input)

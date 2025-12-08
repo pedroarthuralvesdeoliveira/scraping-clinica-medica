@@ -16,7 +16,7 @@ class AppointmentCanceller(Browser):
         super().__init__()
         
     def _check_scheduled_time(self, data_desejada: str):
-        dateAppointment = self.find_element(By.ID, "dataAgenda")
+        dateAppointment = self.wait_for_element(By.ID, "dataAgenda")
 
         try:
             data_obj = datetime.strptime(data_desejada, "%d/%m/%Y")
@@ -51,16 +51,17 @@ class AppointmentCanceller(Browser):
                 "status": "error",
                 "message": "Falha ao definir data com JavaScript.",
             }
-
-        valor_final_campo = dateAppointment.get_attribute("value")
-        print(
-            f"Valor final no campo de data (value property): '{valor_final_campo}' (Esperado: '{data_formatada_para_input}')"
-        )
-
-        if valor_final_campo != data_formatada_para_input:
+            
+        if dateAppointment: 
+            valor_final_campo = dateAppointment.get_attribute("value")
             print(
-                "ALERTA: O valor final no campo não corresponde ao esperado após injeção de JS!"
+                f"Valor final no campo de data (value property): '{valor_final_campo}' (Esperado: '{data_formatada_para_input}')"
             )
+    
+            if valor_final_campo != data_formatada_para_input:
+                print(
+                    "ALERTA: O valor final no campo não corresponde ao esperado após injeção de JS!"
+                )
 
         print(f"Data selecionada (original): {data_desejada}")
 
