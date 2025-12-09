@@ -46,7 +46,7 @@ class AvailabilityChecker(Browser):
             print(f"Data selecionada: {data_desejada}")
 
             try:
-                no_expediente_div = self.find_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+                no_expediente_div = self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
                 if no_expediente_div:
                     print(f"A data {data_desejada} é um fim de semana ou feriado.")
                     return {"status": "unavailable", "message": f"A data {data_desejada} não tem expediente."}
@@ -57,16 +57,16 @@ class AvailabilityChecker(Browser):
 
             try:
                 horario_tr_xpath = f"//tr[@id='{horario_id}']"
-                self.find_element(By.XPATH, horario_tr_xpath)
+                self.wait_for_element(By.XPATH, horario_tr_xpath)
                 print(f"Linha de horário {horario_desejado} (ID: {horario_id}) encontrada na grade.")
             except NoSuchElementException:
                 print(f"ERRO: A linha de horário {horario_desejado} (ID: {horario_id}) não existe na grade para este dia.")
                 return {"status": "unavailable", "message": f"Horário {horario_desejado} não existe na grade para {data_desejada}."}
 
             elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
-            elementos_filhos = self.find_elements(By.XPATH, elementos_filhos_xpath)
+            elementos_filhos = self.wait_for_element(By.XPATH, elementos_filhos_xpath)
 
-            if len(elementos_filhos) > 0:
+            if elementos_filhos and len(elementos_filhos) > 0:
                 print(f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} está OCUPADO.")
                 return {"status": "unavailable", "message": f"Horário {horario_desejado} em {data_desejada} indisponível."}
             else:
@@ -106,7 +106,7 @@ class AvailabilityChecker(Browser):
             print(f"Data selecionada: {data_desejada}. Verificando horários entre {horario_inicial} e {horario_final}.")
 
             try:
-                self.find_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+                self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
                 return {"status": "unavailable", "message": f"A data {data_desejada} não tem expediente."}
             except NoSuchElementException:
                 pass
@@ -115,15 +115,16 @@ class AvailabilityChecker(Browser):
             horario_final_id = int((horario_final or "19:30").replace(":", "") + "00")
 
             elementos_filhos_xpath = "//tr[@class='ui-droppable' and normalize-space(td[2]) = '' and not(td[2]/*)]"
-            elementos_filhos = self.find_elements(By.XPATH, elementos_filhos_xpath)
+            elementos_filhos = self.wait_for_element(By.XPATH, elementos_filhos_xpath)
 
             available_times = []
 
-            for slot_tr in elementos_filhos:
-                slot_id = slot_tr.get_attribute("id")
-                print(f"Id do slot: {slot_id}, inicial: {horario_inicial_id}, final: {horario_final_id}")
-                if slot_id and (int(slot_id) >= horario_inicial_id) and (int(slot_id) <= horario_final_id):
-                    available_times.append(slot_tr.find_element(By.TAG_NAME, "a").text)
+            if elementos_filhos:
+                for slot_tr in elementos_filhos:
+                    slot_id = slot_tr.get_attribute("id")
+                    print(f"Id do slot: {slot_id}, inicial: {horario_inicial_id}, final: {horario_final_id}")
+                    if slot_id and (int(slot_id) >= horario_inicial_id) and (int(slot_id) <= horario_final_id):
+                        available_times.append(slot_tr.wait_for_element(By.TAG_NAME, "a").text)
 
             return {"status": "success", "date": data_desejada, "slots": available_times}
         else:
@@ -163,7 +164,7 @@ class AvailabilityChecker(Browser):
                 is_working_day = True
                 
                 try:
-                    self.find_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+                    self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
                     is_working_day = False
                 except NoSuchElementException:
                     pass
@@ -173,7 +174,7 @@ class AvailabilityChecker(Browser):
                     try:
                         available_slot_xpath = "//a[starts-with(@href, 'javascript:marcaHorarioAgenda')]"
 
-                        available_slots = self.find_elements(By.XPATH, available_slot_xpath)
+                        available_slots = self.wait_for_element(By.XPATH, available_slot_xpath)
 
                         if available_slots:
                             next_time = available_slots[0].text

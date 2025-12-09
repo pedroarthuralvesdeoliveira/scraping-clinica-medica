@@ -1,15 +1,15 @@
 from pydantic import BaseModel
 
 class SchedulePayload(BaseModel):
-    convenio: str | None = None
-    cpf: str
-    data_desejada: str
-    data_nascimento: str
-    horario_desejado: str
     medico: str
+    data_desejada: str
+    horario_desejado: str
     nome_paciente: str
+    data_nascimento: str
+    cpf: str
     telefone: str
     tipo_atendimento: str
+    convenio: str | None = None
 
 class CancelPayload(BaseModel):
     data_desejada: str
