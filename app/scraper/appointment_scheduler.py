@@ -49,27 +49,28 @@ class AppointmentScheduler(Browser):
             print(
                 "ERRO: O container do Select2 para tipo de atendimento não foi encontrado a tempo."
             )
-            raise TimeoutException("Select2 service type container not found.")
+            return
 
         self.execute_script("arguments[0].click();", select_tipo_clickable)
 
-        search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
+        search_field_xpath = "//span[contains(@class,'select2-selection__rendered')]//input[@class='select2-search__field']"
         search_field = self.wait_for_element(By.XPATH, search_field_xpath, timeout=20)
         if not search_field:
             print(
                 "ERRO: O campo de busca do Select2 para tipo de atendimento não foi encontrado a tempo."
             )
-            raise TimeoutException("Select2 service type search field not found.")
+            return
         print("Campo de busca do Select2 para tipo de atendimento encontrado.")
 
-        search_field.clear()
-        search_field.send_keys(tipo_atendimento.strip())  # pyright: ignore[reportOptionalMemberAccess]
+        if search_field:
+            search_field.clear()
+            search_field.send_keys(tipo_atendimento.strip())  # pyright: ignore[reportOptionalMemberAccess]
 
-        time.sleep(2) 
+            time.sleep(2)
 
-        print(f"Tipo de Atendimento '{tipo_atendimento}' selecionado com Enter.")
-        search_field.send_keys(Keys.ENTER)
-        print("Enviado ENTER para selecionar o tipo de atendimento.")
+            print(f"Tipo de Atendimento '{tipo_atendimento}' selecionado com Enter.")
+            search_field.send_keys(Keys.ENTER)
+            print("Enviado ENTER para selecionar o tipo de atendimento.")
 
         if not self.wait_for_staleness_element(search_field):
             print(
@@ -335,7 +336,7 @@ class AppointmentScheduler(Browser):
                 self.execute_script("arguments[0].click();", botao_salvar)
                 print("Clicando em 'Salvar' via JS...")
 
-                time.sleep(2)  
+                time.sleep(2)
                 return {
                     "status": "success",
                     "message": "Agendamento de novo paciente realizado.",
@@ -357,7 +358,7 @@ class AppointmentScheduler(Browser):
                 return {"status": "error", "message": "Botão Salvar não encontrado."}
 
             print("Clicando em 'Salvar' via JS...")
-            time.sleep(5)  
+            time.sleep(5)
 
             print("Agendamento concluído com sucesso!")
             return {"status": "success", "message": "Agendamento realizado."}
