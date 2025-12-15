@@ -54,7 +54,7 @@ class AppointmentScheduler(Browser):
         self.execute_script("arguments[0].click();", select_tipo_clickable)
 
         search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
-        search_field = self.wait_for_element(By.XPATH, search_field_xpath)
+        search_field = self.wait_for_element(By.XPATH, search_field_xpath, timeout=20)
         if not search_field:
             print(
                 "ERRO: O campo de busca do Select2 para tipo de atendimento não foi encontrado a tempo."
