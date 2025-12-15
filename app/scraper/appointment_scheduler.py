@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support import expected_conditions as EC
 
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.keys import Keys
@@ -20,21 +21,24 @@ class AppointmentScheduler(Browser):
         print(f"Selecionando convênio: {convenio_nome}")
 
         select_convenio_clickable = self.wait_for_element(
-            By.ID, "select2-convenio-container"
+            By.ID, "select2-convenio-container", expectation=EC.element_to_be_clickable
         )
         if select_convenio_clickable:
             select_convenio_clickable.click()
 
         search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
-        search_field = self.wait_for_element(By.XPATH, search_field_xpath)
+        search_field = self.wait_for_element(
+            By.XPATH, search_field_xpath, expectation=EC.element_to_be_clickable
+        )
         if search_field:
             search_field.clear()
             search_field.send_keys(convenio_nome.strip())
-
-        time.sleep(2)
+            time.sleep(1)
 
         option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{convenio_nome.upper()}')]"
-        option = self.wait_for_element(By.XPATH, option_xpath)
+        option = self.wait_for_element(
+            By.XPATH, option_xpath, expectation=EC.element_to_be_clickable
+        )
         if option:
             option.click()
 
@@ -42,19 +46,30 @@ class AppointmentScheduler(Browser):
 
     def _select_tipo_atendimento(self, tipo_atendimento: str | None = "Primeira vez"):
         print(f"Selecionando tipo de atendimento: {tipo_atendimento}")
+
         select_tipo_clickable = self.wait_for_element(
-            By.ID, "select2-tipoAtendimento-container", timeout=20
+            By.ID,
+            "select2-tipoAtendimento-container",
+            expectation=EC.element_to_be_clickable,
+            timeout=15,
         )
+
         if not select_tipo_clickable:
             print(
                 "ERRO: O container do Select2 para tipo de atendimento não foi encontrado a tempo."
             )
             return
 
-        self.execute_script("arguments[0].click();", select_tipo_clickable)
+        select_tipo_clickable.click()
 
-        search_field_xpath = "//span[contains(@class,'select2-selection__rendered')]//input[@class='select2-search__field']"
-        search_field = self.wait_for_element(By.XPATH, search_field_xpath, timeout=20)
+        search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
+        search_field = self.wait_for_element(
+            By.XPATH,
+            search_field_xpath,
+            expectation=EC.element_to_be_clickable,
+            timeout=20,
+        )
+
         if not search_field:
             print(
                 "ERRO: O campo de busca do Select2 para tipo de atendimento não foi encontrado a tempo."
@@ -65,32 +80,19 @@ class AppointmentScheduler(Browser):
         if search_field:
             search_field.clear()
             search_field.send_keys(tipo_atendimento.strip())  # pyright: ignore[reportOptionalMemberAccess]
+            time.sleep(1)
 
-            time.sleep(2)
+        option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{(tipo_atendimento or '').upper()}')]"
+        option = self.wait_for_element(
+            By.XPATH, option_xpath, expectation=EC.element_to_be_clickable
+        )
 
-            print(f"Tipo de Atendimento '{tipo_atendimento}' selecionado com Enter.")
-            search_field.send_keys(Keys.ENTER)
-            print("Enviado ENTER para selecionar o tipo de atendimento.")
-
-        if not self.wait_for_staleness_element(search_field):
-            print(
-                "Campo de busca do Select2 para tipo de atendimento ainda visível após ENTER. Tentando clicar na opção."
-            )
-        else:
-            print(
-                "Campo de busca do Select2 para tipo de atendimento desapareceu, indicando seleção por ENTER."
-            )
-            return
-
-        option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{tipo_atendimento}')]"
-        option = self.wait_for_element(By.XPATH, option_xpath)
         if option:
-            self.execute_script("arguments[0].click();", option)
-            print(f"Clicado na opção de Tipo de Atendimento: {tipo_atendimento}")
-            time.sleep(2)
+            option.click()
+            print(f"Tipo de Atendimento '{tipo_atendimento}' selecionado com clique.")
         else:
             print(
-                f"ERRO: Opção para o tipo de atendimento '{tipo_atendimento}' não encontrada para clique após tentar ENTER."
+                f"ERRO: Opção para o tipo de atendimento '{tipo_atendimento}' não encontrada para clique."
             )
             raise TimeoutException(
                 f"Service type option '{tipo_atendimento}' not found."
@@ -249,33 +251,54 @@ class AppointmentScheduler(Browser):
 
             print(f"Pesquisando paciente: {cpf_paciente}")
 
-            try:
-                paciente_encontrado_xpath = (
-                    "//td[contains(@onclick, 'selecionaPacienteAgenda')]"
+            criar_paciente_xpath = (
+                "//td[contains(@onclick, 'adicionaPacienteNovoAgenda')]"
+            )
+            criar_paciente_button = self.wait_for_element(
+                By.XPATH, criar_paciente_xpath, expectation=EC.element_to_be_clickable
+            )
+
+            if not criar_paciente_button:
+                print(
+                    "ERRO: Tabela de resultados da pesquisa de paciente não carregou."
                 )
-                paciente_encontrado = self.wait_for_element(
-                    By.XPATH, paciente_encontrado_xpath
+                return {"status": "error", "message": "Falha na pesquisa do paciente."}
+
+            paciente_encontrado_xpath = (
+                "//td[contains(@onclick, 'selecionaPacienteAgenda')]"
+            )
+            paciente_encontrado_list = self.find_elements(
+                By.XPATH, paciente_encontrado_xpath
+            )
+
+            if paciente_encontrado_list:
+                paciente_encontrado = paciente_encontrado_list[0]
+
+                self.execute_script(
+                    "arguments[0].scrollIntoView(true);", paciente_encontrado
                 )
-                if paciente_encontrado:
+                time.sleep(0.5)
+
+                try:
+                    paciente_encontrado.click()
+                except Exception:
                     self.execute_script("arguments[0].click();", paciente_encontrado)
 
                 print(f"Paciente com CPF {cpf_paciente} encontrado e selecionado.")
 
-            except TimeoutException:
+            else:
                 print(
                     f"Paciente com CPF {cpf_paciente} não encontrado. Iniciando criação de novo paciente."
                 )
 
-                criar_paciente_xpath = (
-                    "//td[contains(@onclick, 'adicionaPacienteNovoAgenda')]"
-                )
-                criar_paciente_button = self.wait_for_element(
-                    By.XPATH, criar_paciente_xpath
-                )
                 if criar_paciente_button:
-                    criar_paciente_button.click()
+                    try:
+                        criar_paciente_button.click()
+                    except:
+                        self.execute_script(
+                            "arguments[0].click();", criar_paciente_button
+                        )
 
-                # Data de Nascimento
                 data_nascimento_input = self.wait_for_element(
                     By.ID, "dataNascimentoAgenda"
                 )
@@ -286,7 +309,6 @@ class AppointmentScheduler(Browser):
                     f"Data de nascimento preenchida: {paciente_info['data_nascimento']}"
                 )
 
-                # Telefone
                 telefone_input = self.wait_for_element(By.ID, "numeroTelefone")
                 telefone_val = paciente_info["telefone"]
                 self.execute_script(
@@ -298,7 +320,6 @@ class AppointmentScheduler(Browser):
 
                 print(f"Telefone preenchido: {paciente_info['telefone']}")
 
-                # CPF
                 cpf_selector = "input[id='cpfPaciente'][type='text']"
                 cpf_input = self.wait_for_element(By.CSS_SELECTOR, cpf_selector)
                 self.execute_script(
@@ -347,7 +368,12 @@ class AppointmentScheduler(Browser):
 
             self._select_tipo_atendimento(tipo_atendimento)
 
-            botao_salvar = self.wait_for_element(By.ID, "btSalvarAgenda", timeout=20)
+            botao_salvar = self.wait_for_element(
+                By.ID,
+                "btSalvarAgenda",
+                expectation=EC.element_to_be_clickable,
+                timeout=20,
+            )
 
             if not botao_salvar:
                 print(
@@ -381,51 +407,6 @@ class AppointmentScheduler(Browser):
                     "ERRO: Botão 'Salvar' não encontrado para agendamento de paciente existente."
                 )
                 self.save_screenshot("erro_botao_salvar_paciente_existente.png")
-
-                # Debugging profundo via logs
-                print("--- DEBUG: Listando botões visíveis na página ---")
-                try:
-                    buttons = self.driver.find_elements(By.TAG_NAME, "button")
-                    for btn in buttons:
-                        try:
-                            print(
-                                f"BUTTON: ID='{btn.get_attribute('id')}', Class='{btn.get_attribute('class')}', Text='{btn.text}'"
-                            )
-                        except:
-                            pass
-                except:
-                    pass
-
-                print("--- DEBUG: Listando inputs do tipo button/submit ---")
-                try:
-                    inputs = self.driver.find_elements(By.TAG_NAME, "input")
-                    for inp in inputs:
-                        try:
-                            if inp.get_attribute("type") in ["button", "submit"]:
-                                print(
-                                    f"INPUT: ID='{inp.get_attribute('id')}', Val='{inp.get_attribute('value')}'"
-                                )
-                        except:
-                            pass
-                except:
-                    pass
-
-                print("--- DEBUG: Verificando iframes ---")
-                try:
-                    iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
-                    print(f"Total iframes encontrados: {len(iframes)}")
-                    for iframe in iframes:
-                        try:
-                            print(
-                                f"IFRAME: ID='{iframe.get_attribute('id')}', Name='{iframe.get_attribute('name')}'"
-                            )
-                        except:
-                            pass
-                except:
-                    pass
-                print("--- FIM DEBUG ---")
-
-                return {"status": "error", "message": "Botão Salvar não encontrado."}
 
             print("Clicando em 'Salvar' via JS...")
             time.sleep(5)

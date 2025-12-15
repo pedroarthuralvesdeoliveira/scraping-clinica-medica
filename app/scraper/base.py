@@ -45,10 +45,10 @@ class Browser:
         except TimeoutException:
             return False
     
-    def wait_for_element(self, by, value, timeout=10):
+    def wait_for_element(self, by, value, expectation = EC.presence_of_element_located, timeout=10):
         try:
             element = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((by, value))
+                expectation((by, value))
             )
             return element
         except TimeoutException:
