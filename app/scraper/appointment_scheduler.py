@@ -354,12 +354,11 @@ class AppointmentScheduler(Browser):
                     "Botão 'Salvar' por ID não encontrado. Tentando estratégia reforçada..."
                 )
 
-                # Tentativa 2: CSS Selector específico com classes
                 try:
                     botao_salvar = self.wait_for_element(
                         By.CSS_SELECTOR,
                         "button#btSalvarAgenda.btn.btn-success",
-                        timeout=5,
+                        timeout=15,
                     )
                     if botao_salvar:
                         print("Botão 'Salvar' encontrado via CSS Selector.")
@@ -371,7 +370,7 @@ class AppointmentScheduler(Browser):
                 botao_salvar = self.wait_for_element(
                     By.XPATH,
                     "//button[@id='btSalvarAgenda']//span[contains(text(), 'Salvar')]",
-                    timeout=5,
+                    timeout=15,
                 )
 
             if botao_salvar:
@@ -383,12 +382,48 @@ class AppointmentScheduler(Browser):
                 )
                 self.save_screenshot("erro_botao_salvar_paciente_existente.png")
 
+                # Debugging profundo via logs
+                print("--- DEBUG: Listando botões visíveis na página ---")
                 try:
-                    with open("debug_page_source.html", "w", encoding="utf-8") as f:
-                        f.write(self.driver.page_source)
-                    print("Source da página salvo em 'debug_page_source.html'")
-                except Exception as e:
-                    print(f"Erro ao salvar source da página: {e}")
+                    buttons = self.driver.find_elements(By.TAG_NAME, "button")
+                    for btn in buttons:
+                        try:
+                            print(
+                                f"BUTTON: ID='{btn.get_attribute('id')}', Class='{btn.get_attribute('class')}', Text='{btn.text}'"
+                            )
+                        except:
+                            pass
+                except:
+                    pass
+
+                print("--- DEBUG: Listando inputs do tipo button/submit ---")
+                try:
+                    inputs = self.driver.find_elements(By.TAG_NAME, "input")
+                    for inp in inputs:
+                        try:
+                            if inp.get_attribute("type") in ["button", "submit"]:
+                                print(
+                                    f"INPUT: ID='{inp.get_attribute('id')}', Val='{inp.get_attribute('value')}'"
+                                )
+                        except:
+                            pass
+                except:
+                    pass
+
+                print("--- DEBUG: Verificando iframes ---")
+                try:
+                    iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+                    print(f"Total iframes encontrados: {len(iframes)}")
+                    for iframe in iframes:
+                        try:
+                            print(
+                                f"IFRAME: ID='{iframe.get_attribute('id')}', Name='{iframe.get_attribute('name')}'"
+                            )
+                        except:
+                            pass
+                except:
+                    pass
+                print("--- FIM DEBUG ---")
 
                 return {"status": "error", "message": "Botão Salvar não encontrado."}
 
