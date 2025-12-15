@@ -347,7 +347,33 @@ class AppointmentScheduler(Browser):
 
             self._select_tipo_atendimento(tipo_atendimento)
 
-            botao_salvar = self.wait_for_element(By.ID, "btSalvarAgenda", timeout=30)
+            botao_salvar = self.wait_for_element(By.ID, "btSalvarAgenda", timeout=20)
+
+            if not botao_salvar:
+                print(
+                    "Botão 'Salvar' por ID não encontrado. Tentando estratégia reforçada..."
+                )
+
+                # Tentativa 2: CSS Selector específico com classes
+                try:
+                    botao_salvar = self.wait_for_element(
+                        By.CSS_SELECTOR,
+                        "button#btSalvarAgenda.btn.btn-success",
+                        timeout=5,
+                    )
+                    if botao_salvar:
+                        print("Botão 'Salvar' encontrado via CSS Selector.")
+                except Exception as e:
+                    pass
+
+            if not botao_salvar:
+                print("Tentando encontrar pelo texto 'Salvar'...")
+                botao_salvar = self.wait_for_element(
+                    By.XPATH,
+                    "//button[@id='btSalvarAgenda']//span[contains(text(), 'Salvar')]",
+                    timeout=5,
+                )
+
             if botao_salvar:
                 self.execute_script("arguments[0].click();", botao_salvar)
 
@@ -355,6 +381,15 @@ class AppointmentScheduler(Browser):
                 print(
                     "ERRO: Botão 'Salvar' não encontrado para agendamento de paciente existente."
                 )
+                self.save_screenshot("erro_botao_salvar_paciente_existente.png")
+
+                try:
+                    with open("debug_page_source.html", "w", encoding="utf-8") as f:
+                        f.write(self.driver.page_source)
+                    print("Source da página salvo em 'debug_page_source.html'")
+                except Exception as e:
+                    print(f"Erro ao salvar source da página: {e}")
+
                 return {"status": "error", "message": "Botão Salvar não encontrado."}
 
             print("Clicando em 'Salvar' via JS...")
