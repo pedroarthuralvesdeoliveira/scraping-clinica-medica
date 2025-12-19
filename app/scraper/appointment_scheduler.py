@@ -219,8 +219,14 @@ class AppointmentScheduler(Browser):
             horario_xpath = f"//a[starts-with(@href, 'javascript:marcaHorarioAgenda') and normalize-space()='{horario_desejado}']"
 
             try:
-                horario_slot = self.wait_for_element(By.XPATH, horario_xpath)
-                self.execute_script("arguments[0].click();", horario_slot)
+                horario_slot = self.wait_for_element(By.XPATH, horario_xpath, timeout=15)
+                if horario_slot:
+                    self.execute_script("arguments[0].click();", horario_slot)
+                else: 
+                    horario_xpath = f"//tr[@id='{horario_id}']//a[contains(text(), '{horario_desejado}')]"
+                    horario_slot = self.wait_for_element(By.XPATH, horario_xpath, timeout=15)
+                    if horario_slot:
+                        self.execute_script("arguments[0].click();", horario_slot)
 
                 print(f"Horário selecionado (via JS): {horario_desejado}")
 
