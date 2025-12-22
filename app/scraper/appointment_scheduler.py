@@ -261,12 +261,15 @@ class AppointmentScheduler(Browser):
                 "//td[contains(@onclick, 'adicionaPacienteNovoAgenda')]"
             )
             criar_paciente_button = self.wait_for_element(
-                By.XPATH, criar_paciente_xpath, expectation=EC.element_to_be_clickable
+                By.XPATH, 
+                criar_paciente_xpath, 
+                expectation=EC.visibility_of_element_located, 
+                timeout=20
             )
 
             if not criar_paciente_button:
                 print(
-                    "ERRO: Tabela de resultados da pesquisa de paciente não carregou."
+                    "ERRO: O botão de 'Cadastrar Novo' não apareceu após a pesquisa."
                 )
                 return {"status": "error", "message": "Falha na pesquisa do paciente."}
 
@@ -283,7 +286,7 @@ class AppointmentScheduler(Browser):
                 self.execute_script(
                     "arguments[0].scrollIntoView(true);", paciente_encontrado
                 )
-                time.sleep(0.5)
+                time.sleep(1)
 
                 try:
                     paciente_encontrado.click()
