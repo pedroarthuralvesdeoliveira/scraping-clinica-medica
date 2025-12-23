@@ -14,7 +14,7 @@ class Browser:
 
         prefs = {"safebrowsing.enabled": True}
         options.add_experimental_option("prefs", prefs)
-        # options.add_argument("--headless=new")
+        options.add_argument("--headless=new")
         options.add_argument(
             "--no-sandbox"
         )  # Necessário para rodar como root/em containers
