@@ -24,7 +24,10 @@ class AppointmentScheduler(Browser):
             By.ID, "select2-convenio-container", expectation=EC.element_to_be_clickable
         )
         if select_convenio_clickable:
-            select_convenio_clickable.click()
+            try:
+                select_convenio_clickable.click()
+            except:
+                self.execute_script("arguments[0].click();", select_convenio_clickable)
 
         search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
         search_field = self.wait_for_element(
@@ -40,7 +43,10 @@ class AppointmentScheduler(Browser):
             By.XPATH, option_xpath, expectation=EC.element_to_be_clickable
         )
         if option:
-            option.click()
+            try:
+                option.click()
+            except:
+                self.execute_script("arguments[0].click();", option)
 
         print(f"Convênio '{convenio_nome}' selecionado com sucesso.")
 
@@ -59,8 +65,10 @@ class AppointmentScheduler(Browser):
                 "ERRO: O container do Select2 para tipo de atendimento não foi encontrado a tempo."
             )
             return
-
-        select_tipo_clickable.click()
+        try:
+            select_tipo_clickable.click()
+        except:
+            self.execute_script("arguments[0].click();", select_tipo_clickable)
 
         search_field_xpath = "//span[contains(@class,'select2-container--open')]//input[@class='select2-search__field']"
         search_field = self.wait_for_element(
@@ -88,7 +96,10 @@ class AppointmentScheduler(Browser):
         )
 
         if option:
-            option.click()
+            try:
+                option.click()
+            except:
+                self.execute_script("arguments[0].click();", option)
             print(f"Tipo de Atendimento '{tipo_atendimento}' selecionado com clique.")
         else:
             print(
@@ -216,37 +227,34 @@ class AppointmentScheduler(Browser):
                 self.save_screenshot("error_screenshot_validacao.png")
                 return {"status": "error", "message": str(e)}
 
-            horario_xpath = f"//a[starts-with(@href, 'javascript:marcaHorarioAgenda') and normalize-space()='{horario_desejado}']"
+            horario_link_xpath = f"//tr[@id='{horario_id}']//a[starts-with(@href, 'javascript:marcaHorarioAgenda') and normalize-space()='{horario_desejado}']"
+            horario_link = self.wait_for_element(By.XPATH, horario_link_xpath)
 
-            try:
-                horario_slot = self.wait_for_element(
-                    By.XPATH, horario_xpath, timeout=15
-                )
-                if horario_slot:
-                    self.execute_script("arguments[0].click();", horario_slot)
-                else:
-                    horario_xpath = f"//tr[@id='{horario_id}']//a[contains(text(), '{horario_desejado}')]"
-                    horario_slot = self.wait_for_element(
-                        By.XPATH, horario_xpath, timeout=15
-                    )
-                    if horario_slot:
-                        self.execute_script("arguments[0].click();", horario_slot)
-
-                print(f"Horário selecionado (via JS): {horario_desejado}")
-
-            except TimeoutException:
-                print(f"Erro: Não foi possível encontrar o horário {horario_desejado}.")
+            if horario_link:
                 print(
-                    f"Verifique se o horário está vago ou se o XPATH está correto: {horario_xpath}"
+                    f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} está DISPONÍVEL para o profissional selecionado."
                 )
-                raise
-            except Exception as e:
-                print(f"Erro ao tentar clicar no horário: {e}")
-                raise
+                try:
+                    horario_link.click()
+                except Exception as e:
+                    print(f"Erro ao clicar no horário {horario_desejado}: {e}")
+                    self.execute_script("arguments[0].click();", horario_link)
+            else:
+                print(
+                    f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} NÃO está disponível ou não existe como opção de agendamento."
+                )
+                return {
+                    "status": "unavailable",
+                    "message": f"Horário {horario_desejado} em {data_desejada} indisponível.",
+                }
+
 
             select_type_of_search = self.wait_for_element(By.ID, "tipoPesquisaPaciente")
             if select_type_of_search:
-                select_type_of_search.click()
+                try:
+                    select_type_of_search.click()
+                except:
+                    self.execute_script("arguments[0].click();", select_type_of_search)
                 select = Select(select_type_of_search)
                 select.select_by_value("cpf")
 
@@ -261,54 +269,73 @@ class AppointmentScheduler(Browser):
 
             print(f"Pesquisando paciente: {cpf_paciente}")
 
-            criar_paciente_xpath = (
-                "//td[contains(@onclick, 'adicionaPacienteNovoAgenda')]"
-            )
-            criar_paciente_button = self.wait_for_element(
-                By.XPATH,
-                criar_paciente_xpath,
-                expectation=EC.visibility_of_element_located,
-                timeout=20,
+            paciente_encontrado = self.wait_for_element(
+                By.XPATH, 
+                "//td[contains(@onclick, 'selecionaPacienteAgenda')]", 
+                timeout=15, 
+                expectation=EC.visibility_of_element_located
             )
 
-            if not criar_paciente_button:
-                print("ERRO: O botão de 'Cadastrar Novo' não apareceu após a pesquisa.")
-                return {"status": "error", "message": "Falha na pesquisa do paciente."}
+            if paciente_encontrado:
+                print(f"Paciente encontrado na base (ID/Nome: {paciente_encontrado.text}). Selecionando existente...")
+                self.execute_script("arguments[0].click();", paciente_encontrado)
+                
+                print(f"Paciente com CPF {cpf_paciente} selecionado com sucesso.")
 
-            paciente_encontrado_xpath = (
-                "//td[contains(@onclick, 'selecionaPacienteAgenda')]"
-            )
-            paciente_encontrado_list = self.find_elements(
-                By.XPATH, paciente_encontrado_xpath
-            )
+                time.sleep(2)
 
-            if paciente_encontrado_list:
-                paciente_encontrado = paciente_encontrado_list[0]
-
-                self.execute_script(
-                    "arguments[0].scrollIntoView(true);", paciente_encontrado
+                data_nascimento_input = self.wait_for_element(
+                    By.ID, "dataNascimentoAgenda"
                 )
-                time.sleep(1)
+                
+                if data_nascimento_input:
+                    valor_atual = data_nascimento_input.get_attribute("value")
+        
+                    if not valor_atual or valor_atual.strip() == "" or "/" not in valor_atual:
+                        print(f"Campo data de nascimento vazio. Preenchendo com: {paciente_info['data_nascimento']}")
+                        data_nascimento_input.send_keys(paciente_info["data_nascimento"])
+                    else:
+                        print(f"Data de nascimento já preenchida no sistema: {valor_atual}")
 
-                try:
-                    paciente_encontrado.click()
-                except Exception:
-                    self.execute_script("arguments[0].click();", paciente_encontrado)
+                print(
+                    f"Data de nascimento preenchida: {paciente_info['data_nascimento']}"
+                )
 
-                print(f"Paciente com CPF {cpf_paciente} encontrado e selecionado.")
+                time.sleep(2)
 
             else:
                 print(
-                    f"Paciente com CPF {cpf_paciente} não encontrado. Iniciando criação de novo paciente."
+                    f"Paciente com CPF {cpf_paciente} não apareceu na tabela. Verificando botão de novo cadastro..."
                 )
 
-                if criar_paciente_button:
-                    try:
-                        criar_paciente_button.click()
-                    except:
-                        self.execute_script(
-                            "arguments[0].click();", criar_paciente_button
-                        )
+                self.save_screenshot("debug_paciente_nao_encontrado.png")
+
+                time.sleep(2)
+
+                criar_paciente_xpath = (
+                    "//td[contains(@onclick, 'adicionaPacienteNovoAgenda')]" 
+                )
+                criar_paciente_button = self.wait_for_element(
+                    By.XPATH,
+                    criar_paciente_xpath,
+                    expectation=EC.element_to_be_clickable,
+                    timeout=20,
+                )
+
+                if not criar_paciente_button:
+                    print(
+                        "ERRO: O botão de 'Cadastrar Novo' não apareceu após a pesquisa."
+                    )
+                    self.save_screenshot("erro_botao_cadastrar_novo.png")
+                    return {
+                        "status": "error",
+                        "message": "Falha na pesquisa do paciente.",
+                    }
+
+                try:
+                    criar_paciente_button.click()
+                except:
+                    self.execute_script("arguments[0].click();", criar_paciente_button)
 
                 data_nascimento_input = self.wait_for_element(
                     By.ID, "dataNascimentoAgenda"
@@ -368,7 +395,6 @@ class AppointmentScheduler(Browser):
                 self.execute_script("arguments[0].click();", botao_salvar)
                 print("Clicando em 'Salvar' via JS...")
 
-                # Aguarda o botão sumir (modal fechar) para confirmar ação
                 self.wait_for_staleness_element(botao_salvar, timeout=15)
 
                 time.sleep(5)
@@ -414,17 +440,41 @@ class AppointmentScheduler(Browser):
                 )
 
             if botao_salvar:
-                self.execute_script("arguments[0].click();", botao_salvar)
-                print("Clicando em 'Salvar' via JS...")
+                try:
+                    self.driver.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
+                    time.sleep(1)
+                    botao_salvar.click()
+                    print("Botão 'Salvar' clicado nativamente.")
+                except Exception as e:
+                    print(f"Clique nativo falhou, tentando via JS: {e}")
+                    self.execute_script("arguments[0].click();", botao_salvar)
 
-                # Aguarda o botão sumir (modal fechar) para confirmar ação
-                self.wait_for_staleness_element(botao_salvar, timeout=15)
+                try:
+                    erro_feedback = self.wait_for_element(By.CLASS_NAME, "alert-danger", timeout=3)
+                    if erro_feedback and erro_feedback.is_displayed():
+                        print(f"ERRO DE VALIDAÇÃO NO SISTEMA: {erro_feedback.text}")
+                        self.save_screenshot("erro_validacao_sistema.png")
+                        return {"status": "error", "message": f"Sistema recusou: {erro_feedback.text}"}
+                except:
+                    pass
+
+                foi_fechado = self.wait_for_staleness_element(botao_salvar, timeout=15)
+
+                if foi_fechado:
+                    print("Agendamento concluído com sucesso (modal fechado)!")
+                    return {"status": "success", "message": "Agendamento realizado."}
+                else:
+                    print("ALERTA: O modal de agendamento não fechou após o clique em Salvar.")
+                    self.save_screenshot("erro_modal_preso.png")
+                    return {"status": "error", "message": "O modal de agendamento não fechou."}
 
             else:
                 print(
                     "ERRO: Botão 'Salvar' não encontrado para agendamento de paciente existente."
                 )
                 self.save_screenshot("erro_botao_salvar_paciente_existente.png")
+                return {"status": "error", "message": "O modal de agendamento não fechou."}
+
 
             time.sleep(5)
 
