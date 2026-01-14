@@ -98,9 +98,9 @@ class AppointmentCanceller(Browser):
                     f"Ícone de cancelamento para o paciente {nome_paciente} no horário {horario_desejado} clicado."
                 )
 
-                desmarcado_button = self.wait_for_element(By.CSS_SELECTOR, "button[data-bb-handler='danger']")
                 
                 desmarcado_button = self.wait_for_element(By.CSS_SELECTOR, "button[data-bb-handler='danger']")
+                
                 if not desmarcado_button:
                     print("ERRO: Botão 'Desmarcado' do modal não encontrado.")
                     raise TimeoutException("Botão 'Desmarcado' não encontrado.")
@@ -113,7 +113,11 @@ class AppointmentCanceller(Browser):
                     print("Falha ao clicar no botão 'Desmarcado' via JavaScript. Tentando método padrão.")
                     desmarcado_button = self.wait_for_element(By.CSS_SELECTOR, "button[data-bb-handler='danger']")
                     if desmarcado_button:
-                        desmarcado_button.click()
+                        try: 
+                            desmarcado_button.click()
+                        except Exception:
+                            print("Falha ao clicar no botão 'Desmarcado' via método padrão.")
+                            self.execute_script("arguments[0].click();", desmarcado_button)
                         print("Botão 'Desmarcado' clicado via método padrão.")
                     else:
                         print("ERRO: Botão 'Desmarcado' não encontrado após falha do JS.")
