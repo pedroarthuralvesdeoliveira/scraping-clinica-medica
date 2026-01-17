@@ -13,4 +13,7 @@ dependencies = [
     "selenium>=4.37.0",
     "uvicorn>=0.38.0",
     "webdriver-manager>=4.0.2",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2.4",
+    "pydantic>=2.12.3",
 ]

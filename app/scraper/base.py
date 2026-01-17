@@ -139,7 +139,7 @@ class Browser:
             print(f"Ocorreu outro erro: {e}")
             raise
 
-    def _login(self, medico: str):
+    def _login(self, medico: str | None = None):
         """
         Realiza o login no sistema Softclyn.
         """
@@ -151,13 +151,14 @@ class Browser:
 
             URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
 
-            medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
+            if medico:
+                medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
 
-            for dr in medicos_softclyn_of:
-                if medico_limpo.upper() in dr.upper():
-                    URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
-                    self.is_softclyn_of = True
-                    break
+                for dr in medicos_softclyn_of:
+                    if medico_limpo.upper() in dr.upper():
+                        URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+                        self.is_softclyn_of = True
+                        break
 
             self.get(URL_BASE)
 
