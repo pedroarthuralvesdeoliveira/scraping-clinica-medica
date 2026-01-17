@@ -41,10 +41,7 @@ class AppointmentSyncService:
         if not appointments:
             return None
 
-        latest = max(
-            (app.data_consulta for app in appointments if app.data_consulta),
-            default=None,
-        )
+        latest = appointments[0].data_consulta
         return latest
 
     def determine_appointment_type(
@@ -106,7 +103,7 @@ class AppointmentSyncService:
         """
         print(f"Starting sync for CPF: {cpf}, Patient: {nome_paciente}")
 
-        website_result = self.scraper.get_patient_history(cpf, medico)
+        website_result = self.scraper.get_patient_history(cpf)
 
         if website_result.get("status") != "success":
             print(f"Failed to fetch website data: {website_result}")

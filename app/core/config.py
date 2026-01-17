@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     api_key: str
     redis_url: str
     database_url: str
+    page_load_timeout: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

@@ -17,20 +17,18 @@ class PatientHistoryScraper(Browser):
     def has_next_page(self):
         try:
             next_button = self.wait_for_element(By.XPATH, "//a[@aria-label='Next']")
-            return len(next_button) > 0
+            return next_button is not None
         except NoSuchElementException:
             return False
 
     def go_to_next_page(self):
-        next_button = self.wait_for_element(
-            By.XPATH, "//a[@aria-label='Next']"
-        )
-        try:
-            next_button.click()
-        except:
-            self.execute_script("arguments[0].click();", next_button)
-        finally:
-            time.sleep(2)
+        next_button = self.wait_for_element(By.XPATH, "//a[@aria-label='Next']")
+        if next_button:
+            try:
+                next_button.click()
+            except:
+                self.execute_script("arguments[0].click();", next_button)
+        time.sleep(2)
 
     def is_last_page(self):
         try:
@@ -39,15 +37,17 @@ class PatientHistoryScraper(Browser):
             )
             last_page = self.wait_for_element(
                 By.XPATH, "//a[starts-with(normalize-space(text()), 'Última')]"
-        )
+            )
 
-            return current_page.get_attribute("href") == last_page.get_attribute("href")
+            if current_page and last_page:
+                return current_page.get_attribute("href") == last_page.get_attribute(
+                    "href"
+                )
 
         except NoSuchElementException:
-            # Se não existe "Última", não há paginação
-            return True
+            pass
 
-
+        return True
 
     def get_patient_history(self, cpf: str):
         """
@@ -63,24 +63,21 @@ class PatientHistoryScraper(Browser):
 
             print(f"Navigating to patient history search for CPF: {cpf}")
 
-            try:
+            pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
+            prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
+            if prontuario_menu:
                 try:
-                    pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]" 
-                    prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
                     prontuario_menu.click()
                 except:
                     self.execute_script("arguments[0].click();", prontuario_menu)
 
-                search_patient = self.wait_for_element(By.ID, "tipoPesquisaPacienteGrade")
+            search_patient = self.wait_for_element(By.ID, "tipoPesquisaPacienteGrade")
+            if search_patient:
                 select = Select(search_patient)
                 select.select_by_visible_text("Cpf")
 
-                print("Entered patient history screen.")
-                time.sleep(2)
-
-            except TimeoutException:
-                print("Could not find patient history menu. Using direct search...")
-
+            print("Entered patient history screen.")
+            time.sleep(2)
 
             cpf_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
 
@@ -109,7 +106,9 @@ class PatientHistoryScraper(Browser):
 
             time.sleep(3)
 
-            botao_historico = self.wait_for_element(By.XPATH, "//button[@title='Visualizar Histórico do Paciente.']")
+            botao_historico = self.wait_for_element(
+                By.XPATH, "//button[@title='Visualizar Histórico do Paciente.']"
+            )
 
             if botao_historico:
                 try:
@@ -127,9 +126,8 @@ class PatientHistoryScraper(Browser):
             )
 
             appointments = []
-            
 
-            # for table in tables: 
+            # for table in tables:
             #     profissional = table.wait_for_element(
             #         By.XPATH, ".//tr[td[contains(@class,'active')]]//strong"
             #     ).text.replace("Profissional / Agenda:", "").strip()
@@ -137,7 +135,6 @@ class PatientHistoryScraper(Browser):
             #     print(f"Profissional: {profissional}")
 
             #     linhas = table.find_elements(By.XPATH, ".//tr[td and not(th)]")
-
 
             #     for linha in linhas:
             #         colunas = linha.find_elements(By.TAG_NAME, "td")
@@ -168,9 +165,13 @@ class PatientHistoryScraper(Browser):
                 )
 
                 for table in tables:
-                    profissional = table.find_element(
-                        By.XPATH, ".//tr[td[contains(@class,'active')]]//strong"
-                    ).text.replace("Profissional / Agenda:", "").strip()
+                    profissional = (
+                        table.find_element(
+                            By.XPATH, ".//tr[td[contains(@class,'active')]]//strong"
+                        )
+                        .text.replace("Profissional / Agenda:", "")
+                        .strip()
+                    )
 
                     linhas = table.find_elements(By.XPATH, ".//tr[td and not(th)]")
 
@@ -185,13 +186,15 @@ class PatientHistoryScraper(Browser):
                         if "EXCLUÍDO POR" in dta_atend:
                             continue
 
-                        appointments.append({
-                            "profissional": profissional,
-                            "data_atendimento": dta_atend,
-                            "hora": colunas[1].text.strip(),
-                            "tipo": colunas[5].text.strip(),
-                            "retorno_ate": colunas[7].text.strip()
-                        })
+                        appointments.append(
+                            {
+                                "profissional": profissional,
+                                "data_atendimento": dta_atend,
+                                "hora": colunas[1].text.strip(),
+                                "tipo": colunas[5].text.strip(),
+                                "retorno_ate": colunas[7].text.strip(),
+                            }
+                        )
 
                 if self.is_last_page():
                     break
@@ -201,9 +204,7 @@ class PatientHistoryScraper(Browser):
                 else:
                     break
 
-            
-
-            # print(appointments)
+            print(appointments)
 
             print(f"Found {len(appointments)} appointments for CPF {cpf}.")
             return {"status": "success", "appointments": appointments}
@@ -218,5 +219,4 @@ class PatientHistoryScraper(Browser):
             return {"status": "error", "message": str(e)}
         finally:
             print("Closing browser for patient history scraper.")
-            if "self" in locals():
-                self.quit()
+            self.quit()

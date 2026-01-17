@@ -15,22 +15,33 @@ class Browser:
         prefs = {"safebrowsing.enabled": True}
         options.add_experimental_option("prefs", prefs)
         options.add_argument("--headless=new")
-        options.add_argument(
-            "--no-sandbox"
-        )  # Necessário para rodar como root/em containers
-        options.add_argument(
-            "--disable-dev-shm-usage"
-        )  # Necessário para alguns ambientes Linux
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--start-maximized")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-logging")
+        options.add_argument("--remote-debugging-port=0")
+        options.add_argument("--disable-web-security")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-features=IsolateOrigins,site-per-process")
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--disable-ipc-flooding-protection")
+        options.add_argument("--disable-software-rasterizer")
+        options.add_argument("--disable-infobars")
+        options.add_experimental_option("useAutomationExtension", False)
+        options.set_capability("pageLoadStrategy", "none")
 
         self.driver = webdriver.Chrome(options=options)
+        self.driver.set_page_load_timeout(180)
+        self.driver.implicitly_wait(10)
         self.settings = get_settings()
         self.is_softclyn_of = False
 
-    def get(self, url):
+    def get(self, url, timeout=60):
+        self.driver.set_page_load_timeout(timeout)
         self.driver.get(url)
 
     def find_element(self, by, value):
@@ -64,7 +75,10 @@ class Browser:
         self.driver.refresh()
 
     def save_screenshot(self, filename):
-        self.driver.save_screenshot(filename)
+        try:
+            self.driver.save_screenshot(filename)
+        except Exception as e:
+            print(f"Could not save screenshot (driver may be disconnected): {e}")
 
     def quit(self):
         if self.driver:
@@ -72,18 +86,20 @@ class Browser:
 
     def _click_on_appointment_menu(self):
         menu = self.wait_for_element(By.ID, "menuAtendimentoLi")
-        try:
-            menu.click()
-        except:
-            self.execute_script("arguments[0].click();", menu)
+        if menu:
+            try:
+                menu.click()
+            except:
+                self.execute_script("arguments[0].click();", menu)
 
         print("Clicando em 'Agendamento' no menu...")
 
         agendamento = self.wait_for_element(By.ID, "M1")
-        try:
-            agendamento.click()
-        except:
-            self.execute_script("arguments[0].click();", agendamento)
+        if agendamento:
+            try:
+                agendamento.click()
+            except:
+                self.execute_script("arguments[0].click();", agendamento)
 
         print("Entrou na tela de agendamento.")
 
@@ -160,7 +176,7 @@ class Browser:
                         self.is_softclyn_of = True
                         break
 
-            self.get(URL_BASE)
+            self.get(URL_BASE, timeout=self.settings.page_load_timeout)
 
             self.wait_for_element(By.TAG_NAME, "body")
 
@@ -176,8 +192,8 @@ class Browser:
             )
         except Exception as e:
             print(f"Erro ao realizar login: {e}")
-            self.quit()
-            raise
+        finally:
+            pass
 
     def _close_modal(self):
         try:

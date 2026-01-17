@@ -23,7 +23,7 @@ class CancelPayload(BaseModel):
 
 class SyncPayload(BaseModel):
     cpf: str
-    nome_paciente: str
+    nome_paciente: str | None = None
     medico: str | None = None
 
 
