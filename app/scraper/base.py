@@ -176,24 +176,49 @@ class Browser:
                         self.is_softclyn_of = True
                         break
 
+            print(f"Navigating to: {URL_BASE}")
             self.get(URL_BASE, timeout=self.settings.page_load_timeout)
 
+            time.sleep(3)
+
+            print("Waiting for login form...")
             self.wait_for_element(By.TAG_NAME, "body")
 
-            user = self.find_element(By.ID, "usuario")
-            user.send_keys(self.settings.softclyn_user)
-            password = self.find_element(By.ID, "senha")
-            password.send_keys(self.settings.softclyn_pass)
-
-            self.wait_for_element(By.ID, "btLogin")
-
+            user = self.wait_for_element(By.ID, "usuario", timeout=10)
+            if not user:
+                raise Exception("User field not found")
+            print("User field found")
+            user.clear()
             self.execute_script(
-                "arguments[0].click();", self.find_element(By.ID, "btLogin")
+                "arguments[0].value = arguments[1];", user, self.settings.softclyn_user
             )
+            time.sleep(1)
+
+            password = self.wait_for_element(By.ID, "senha", timeout=10)
+            if not password:
+                raise Exception("Password field not found")
+            print("Password field found")
+            password.clear()
+            self.execute_script(
+                "arguments[0].value = arguments[1];",
+                password,
+                self.settings.softclyn_pass,
+            )
+            time.sleep(1)
+
+            login_button = self.wait_for_element(By.ID, "btLogin", timeout=10)
+            if not login_button:
+                raise Exception("Login button not found")
+            print("Login button found, clicking...")
+            self.execute_script("arguments[0].click();", login_button)
+            time.sleep(2)
+
+            print("Login completed successfully")
+
         except Exception as e:
             print(f"Erro ao realizar login: {e}")
-        finally:
-            pass
+            self.save_screenshot("login_error.png")
+            raise
 
     def _close_modal(self):
         try:

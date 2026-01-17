@@ -71,26 +71,42 @@ class PatientHistoryScraper(Browser):
                 except:
                     self.execute_script("arguments[0].click();", prontuario_menu)
 
-            search_patient = self.wait_for_element(By.ID, "tipoPesquisaPacienteGrade")
+            search_patient = self.wait_for_element(
+                By.ID,
+                "tipoPesquisaPacienteGrade",
+                expectation=EC.element_to_be_clickable,
+            )
+
             if search_patient:
                 select = Select(search_patient)
-                select.select_by_visible_text("Cpf")
+                try:
+                    select.select_by_visible_text("Cpf")
+                except:
+                    select.select_by_value("cpf")
+                time.sleep(2)
 
             print("Entered patient history screen.")
-            time.sleep(2)
 
             cpf_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
 
             if cpf_field:
                 cpf_field.clear()
-                cpf_field.send_keys(cpf)
+                try:
+                    cpf_field.send_keys(cpf)
+                except:
+                    self.execute_script(
+                        "arguments[0].value = arguments[1];", cpf_field, cpf
+                    )
 
                 print(f"CPF {cpf} entered in search field.")
+                # self.save_screenshot("patient_history_cpf_entered.png")
 
                 search_button = self.wait_for_element(
                     By.ID,
                     "btPesquisaPacienteGrade1",
                 )
+
+                time.sleep(2)
 
                 if search_button:
                     try:
@@ -119,45 +135,22 @@ class PatientHistoryScraper(Browser):
             else:
                 print("Could not find historical button.")
 
-            time.sleep(2)
+            time.sleep(3)
 
+            # self.save_screenshot("patient_history_tables.png")
             tables = self.wait_for_element(
                 By.XPATH, "//table[contains(@class,'table-bordered')]"
             )
 
+            if not tables:
+                print(
+                    "No tables found with xpath //table[contains(@class,'table-bordered')]"
+                )
+                self.save_screenshot("no_tables_error.png")
+                return {"status": "error", "message": "No tables found"}
+
+            print(f"Found tables on page")
             appointments = []
-
-            # for table in tables:
-            #     profissional = table.wait_for_element(
-            #         By.XPATH, ".//tr[td[contains(@class,'active')]]//strong"
-            #     ).text.replace("Profissional / Agenda:", "").strip()
-
-            #     print(f"Profissional: {profissional}")
-
-            #     linhas = table.find_elements(By.XPATH, ".//tr[td and not(th)]")
-
-            #     for linha in linhas:
-            #         colunas = linha.find_elements(By.TAG_NAME, "td")
-
-            #         if len(colunas) < 8:
-            #             continue
-
-            #         dta_atend = colunas[0].text.strip()
-
-            #         if "EXCLUÍDO POR" in dta_atend:
-            #             continue
-
-            #         hora = colunas[1].text.strip()
-            #         tipo = colunas[5].text.strip()
-            #         retorno_ate = colunas[7].text.strip()
-
-            #         appointments.append({
-            #             "profissional": profissional,
-            #             "data_atendimento": dta_atend,
-            #             "hora": hora,
-            #             "tipo": tipo,
-            #             "retorno_ate": retorno_ate
-            #         })
 
             while True:
                 tables = self.driver.find_elements(
@@ -165,13 +158,23 @@ class PatientHistoryScraper(Browser):
                 )
 
                 for table in tables:
-                    profissional = (
-                        table.find_element(
-                            By.XPATH, ".//tr[td[contains(@class,'active')]]//strong"
-                        )
-                        .text.replace("Profissional / Agenda:", "")
-                        .strip()
-                    )
+                    profissional = "Desconhecido"
+                    for xpath in [
+                        ".//tr[td[contains(@class,'active')]]//strong",
+                        ".//tr[contains(@class,'active')]//strong",
+                        ".//td[@class='active']/ancestor::tr//strong",
+                        ".//strong[contains(text(),'Profissional')]",
+                    ]:
+                        try:
+                            profissional = (
+                                table.find_element(By.XPATH, xpath)
+                                .text.replace("Profissional / Agenda:", "")
+                                .strip()
+                            )
+                            print(f"Found profissional: {profissional}")
+                            break
+                        except Exception:
+                            continue
 
                     linhas = table.find_elements(By.XPATH, ".//tr[td and not(th)]")
 
@@ -204,7 +207,11 @@ class PatientHistoryScraper(Browser):
                 else:
                     break
 
-            print(appointments)
+
+            if len(appointments) == 0:
+                print(f"No appointments found for CPF {cpf}.")
+                self.save_screenshot("patient_history_no_appointments.png")
+                return {"status": "success", "appointments": []}
 
             print(f"Found {len(appointments)} appointments for CPF {cpf}.")
             return {"status": "success", "appointments": appointments}
