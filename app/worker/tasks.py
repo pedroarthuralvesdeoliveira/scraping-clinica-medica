@@ -6,7 +6,6 @@ from app.core.dependencies import get_settings
 from app.scraper.appointment_scheduler import AppointmentScheduler
 from app.scraper.appointment_canceller import AppointmentCanceller
 from app.scraper.availability_checker import AvailabilityChecker
-from app.services.appointment_sync import AppointmentSyncService
 
 settings = get_settings()
 redis_url = settings.redis_url
@@ -67,11 +66,6 @@ def schedule_appointment_task(
             )
             print(f"Worker finalizou tarefa de agendamento. Resultado: {result}")
 
-            if result.get("status") == "success":
-                print("Agendamento bem-sucedido. Iniciando sincronização...")
-                sync_result = sync_patient_appointments_task(cpf, nome, medico)
-                result["sync_result"] = sync_result
-
             return result
     except Exception as e:
         print(f"Erro ao processar tarefa de agendamento (Lock/Outro): {e}")
@@ -92,11 +86,6 @@ def cancel_appointment_task(
     )
     print(f"Worker finalizou tarefa de cancelamento. Resultado: {result}")
 
-    if result.get("status") == "success" and cpf:
-        print("Cancelamento bem-sucedido. Iniciando sincronização...")
-        sync_result = sync_patient_appointments_task(cpf, nome_paciente, medico)
-        result["sync_result"] = sync_result
-
     return result
 
 
@@ -115,52 +104,3 @@ def verify_doctors_calendar_task(
     )
     print(f"Worker finalizou tarefa de verificação. Resultado: {result}")
     return result
-
-
-@shared_task(name="sync_patient_appointments_task")
-def sync_patient_appointments_task(
-    cpf: str, nome_paciente: str, medico: str | None = None
-):
-    print(f"Worker recebeu tarefa de sincronização para CPF: {cpf}")
-
-    patient_history = PatientHistoryScraper()
-    result = patient_history.get_patient_history(cpf)
-    print(f"Worker finalizou tarefa de sincronização. Resultado: {result}")
-    return result
-
-    # lock_key = f"lock:sync:{cpf}"
-
-    # try:
-    #     with redis_lock(lock_key, timeout=30, expire=300):
-    #         sync_service = AppointmentSyncService()
-    #         result = sync_service.compare_and_sync(cpf, nome_paciente, medico)
-    #         print(f"Worker finalizou tarefa de sincronização. Resultado: {result}")
-    #         return result
-    # except Exception as e:
-    #     print(f"Erro ao processar tarefa de sincronização: {e}")
-    #     return {
-    #         "status": "error",
-    #         "message": f"Falha na execução ou lock timeout: {str(e)}",
-    #     }
-
-
-# @shared_task(name="sync_all_recent_patients_task")
-# def sync_all_recent_patients_task():
-#     print("Worker iniciou tarefa de sincronização de todos os pacientes recentes")
-
-#     lock_key = "lock:sync_all"
-
-#     try:
-#         with redis_lock(lock_key, timeout=300, expire=1800):
-#             sync_service = AppointmentSyncService()
-#             result = sync_service.sync_all_recent_patients(days_back=30)
-#             print(
-#                 f"Worker finalizou tarefa de sincronização de todos os pacientes. Resultado: {result}"
-#             )
-#             return result
-#     except Exception as e:
-#         print(f"Erro ao processar tarefa de sincronização de todos os pacientes: {e}")
-#         return {
-#             "status": "error",
-#             "message": f"Falha na execução ou lock timeout: {str(e)}",
-#         }

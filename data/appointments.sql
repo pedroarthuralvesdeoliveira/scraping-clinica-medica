@@ -1,0 +1,23 @@
+CREATE TABLE public.agendamentos (
+	id bigserial NOT NULL,
+	telefone text NOT NULL,
+	cpf text NOT NULL,
+	nome_paciente text NOT NULL,
+	data_nascimento date NOT NULL,
+	especialidade text NOT NULL,
+	profissional text NOT NULL,
+	data_consulta date NOT NULL,
+	hora_consulta time NOT NULL,
+	updated_at timestamptz NULL,
+	codigo SMALLINT NULL,
+	created_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
+	status text NULL,
+	observacoes text NULL,
+	convenio text NULL,
+	primeira_consulta bool NULL,
+	confirmado_pelo_paciente bool NULL,
+	lembrete_enviado bool NULL,
+	canal_agendamento text NULL,
+	procedimento varchar(255) NULL,
+	valor numeric(10, 2) NULL
+);

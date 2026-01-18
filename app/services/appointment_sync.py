@@ -3,12 +3,12 @@ from datetime import datetime, date, time as time_type
 from typing import List, Optional
 from app.core.database import get_session
 from app.models.agendamento import Agendamento
-from app.scraper.patient_history_scraper import PatientHistoryScraper
+from app.scraper.next_appointments import NextAppointmentsScraper
 
 
 class AppointmentSyncService:
     def __init__(self):
-        self.scraper = PatientHistoryScraper()
+        self.scraper = NextAppointmentsScraper()
 
     def get_db_appointments(
         self, cpf: str, session: Session | None = None
@@ -94,6 +94,97 @@ class AppointmentSyncService:
             "latest_appointment": latest_appointment,
         }
 
+    def sync_all_appointments(self) -> dict:
+        """
+        Syncs all appointments from the website without filtering by patient.
+        This method is designed for cronjob execution every 15 minutes.
+        """
+        print("Starting full appointment sync from website")
+
+        website_result = self.scraper.get_next_appointments()
+
+        if website_result.get("status") != "success":
+            print(f"Failed to fetch website data: {website_result}")
+            return {
+                "status": "error",
+                "message": "Failed to fetch website data",
+                "details": website_result,
+            }
+
+        website_appointments = website_result.get("appointments", [])
+        print(f"Found {len(website_appointments)} appointments on website")
+
+        session = get_session()
+        try:
+            added_count = 0
+            updated_count = 0
+
+            for web_app in website_appointments:
+                try:
+                    nome_paciente = web_app.get("nome_paciente", "")
+                    if not nome_paciente:
+                        continue
+
+                    existing_appointment = (
+                        session.query(Agendamento)
+                        .filter(
+                            Agendamento.nome_paciente == nome_paciente,
+                            Agendamento.data_consulta == web_app.get("data_consulta"),
+                            Agendamento.hora_consulta == web_app.get("hora_consulta"),
+                        )
+                        .first()
+                    )
+
+                    if existing_appointment:
+                        existing_appointment.profissional = web_app.get("profissional")
+                        existing_appointment.procedimento = web_app.get("procedimento")
+                        existing_appointment.status = web_app.get("status")
+                        existing_appointment.primeira_consulta = web_app.get(
+                            "primeira_consulta", False
+                        )
+                        updated_count += 1
+                    else:
+                        agendamento = Agendamento(
+                            cpf="11111111111",  # Will be filled later if needed
+                            codigo=web_app.get("codigo", ""),
+                            nome_paciente=nome_paciente,
+                            data_consulta=web_app.get("data_consulta"),
+                            hora_consulta=web_app.get("hora_consulta"),
+                            data_nascimento=web_app.get("data_nascimento") or "1900-01-01",
+                            telefone=web_app.get("telefone") or "45991919191",
+                            profissional=web_app.get("profissional"),
+                            especialidade=web_app.get("especialidade") or "Padrão",
+                            primeira_consulta=web_app.get("primeira_consulta", False),
+                            status=web_app.get("status"),
+                            procedimento=web_app.get("procedimento"),
+                            observacoes=web_app.get("observacoes") or "Sem observações",
+                            canal_agendamento="website_sync",
+                            created_at=datetime.now(),
+                        )
+                        session.add(agendamento)
+                        added_count += 1
+
+                except Exception as e:
+                    print(f"Error processing appointment: {e}")
+                    continue
+
+            session.commit()
+
+            return {
+                "status": "success",
+                "total_website_appointments": len(website_appointments),
+                "new_appointments_added": added_count,
+                "appointments_updated": updated_count,
+                "sync_timestamp": datetime.now().isoformat(),
+            }
+
+        except Exception as e:
+            session.rollback()
+            print(f"Error during full sync: {e}")
+            return {"status": "error", "message": str(e)}
+        finally:
+            session.close()
+
     def compare_and_sync(
         self, cpf: str, nome_paciente: str, medico: str | None = None
     ) -> dict:
@@ -103,7 +194,7 @@ class AppointmentSyncService:
         """
         print(f"Starting sync for CPF: {cpf}, Patient: {nome_paciente}")
 
-        website_result = self.scraper.get_patient_history(cpf)
+        website_result = self.scraper.get_next_appointments()
 
         if website_result.get("status") != "success":
             print(f"Failed to fetch website data: {website_result}")
@@ -144,7 +235,8 @@ class AppointmentSyncService:
                 try:
                     agendamento = Agendamento(
                         cpf=cpf,
-                        nome_paciente=nome_paciente,
+                        codigo=web_app.get("codigo", ""),
+                        nome_paciente=web_app.get("nome_paciente", nome_paciente),
                         data_consulta=web_app.get("data_consulta"),
                         hora_consulta=web_app.get("hora_consulta"),
                         profissional=web_app.get("profissional"),
@@ -230,3 +322,7 @@ class AppointmentSyncService:
             return {"status": "error", "message": str(e)}
         finally:
             session.close()
+
+if __name__ == "__main__":
+    sync = AppointmentSyncService()
+    sync.sync_all_appointments()

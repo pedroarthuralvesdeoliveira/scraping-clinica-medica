@@ -1,4 +1,5 @@
 import time
+import os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from ..core.dependencies import get_settings
@@ -12,7 +13,18 @@ class Browser:
     def __init__(self, prefs=None):
         options = webdriver.ChromeOptions()
 
-        prefs = {"safebrowsing.enabled": True}
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        DOWNLOAD_DIR = os.path.join(BASE_DIR, "data")
+
+        # Garante que a pasta exista
+        os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+        prefs = {
+            "download.default_directory": DOWNLOAD_DIR,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": True,
+        }
         options.add_experimental_option("prefs", prefs)
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
