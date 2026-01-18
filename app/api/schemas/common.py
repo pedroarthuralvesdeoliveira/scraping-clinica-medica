@@ -25,6 +25,7 @@ class SyncPayload(BaseModel):
     cpf: str
     nome_paciente: str | None = None
     medico: str | None = None
+    codigo: str | None = None
 
 
 class VerifyPayload(BaseModel):

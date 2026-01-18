@@ -32,7 +32,7 @@ class Browser:
         options.add_argument("--disable-software-rasterizer")
         options.add_argument("--disable-infobars")
         options.add_experimental_option("useAutomationExtension", False)
-        options.set_capability("pageLoadStrategy", "none")
+        options.set_capability("pageLoadStrategy", "normal")
 
         self.driver = webdriver.Chrome(options=options)
         self.driver.set_page_load_timeout(180)
