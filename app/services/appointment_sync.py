@@ -10,6 +10,20 @@ class AppointmentSyncService:
     def __init__(self):
         self.scraper = NextAppointmentsScraper()
 
+    def get_all_cpfs(self, session: Session | None = None) -> List[str]:
+        """
+        Retrieves all CPFs from the database.
+        """
+        if not session:
+            session = get_session()
+
+        try:
+            cpfs = session.query(Agendamento.cpf).distinct().all()
+            return [cpf[0] for cpf in cpfs]
+        finally:
+            if not session:
+                session.close()
+
     def get_db_appointments(
         self, cpf: str, session: Session | None = None
     ) -> List[Agendamento]:
@@ -325,4 +339,6 @@ class AppointmentSyncService:
 
 if __name__ == "__main__":
     sync = AppointmentSyncService()
-    sync.sync_all_appointments()
+    # sync.sync_all_appointments()
+    cpfs = sync.get_all_cpfs()
+    print(cpfs)

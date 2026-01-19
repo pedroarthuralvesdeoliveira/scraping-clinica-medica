@@ -109,6 +109,88 @@ class PatientHistoryScraper(Browser):
             print(f"Erro is_last_page: {e}")
             return True
 
+    def get_patient_code(self, cpf: str):
+        try:
+            self._login(medico=None)
+
+            self._close_modal()
+
+            self._click_on_appointment_menu()
+
+            print(f"Navigating to patient history search for CPF: {cpf}")
+
+            pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
+            prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
+            if prontuario_menu:
+                try:
+                    prontuario_menu.click()
+                except:
+                    self.execute_script("arguments[0].click();", prontuario_menu)
+
+            search_patient = self.wait_for_element(
+                By.ID,
+                "tipoPesquisaPacienteGrade",
+                expectation=EC.element_to_be_clickable,
+            )
+
+            if search_patient:
+                select = Select(search_patient)
+                try:
+                    select.select_by_visible_text("Cpf")
+                except:
+                    select.select_by_value("cpf")
+                time.sleep(2)
+
+            print("Entered patient history screen.")
+
+            cpf_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
+
+            if cpf_field:
+                cpf_field.clear()
+                try:
+                    cpf_field.send_keys(cpf)
+                except:
+                    self.execute_script(
+                        "arguments[0].value = arguments[1];", cpf_field, cpf
+                    )
+
+                print(f"CPF {cpf} entered in search field.")
+
+                search_button = self.wait_for_element(
+                    By.ID,
+                    "btPesquisaPacienteGrade1",
+                )
+
+                time.sleep(2)
+
+                if search_button:
+                    try:
+                        search_button.click()
+                    except:
+                        self.execute_script("arguments[0].click();", search_button)
+                    print("Search button clicked.")
+                else:
+                    cpf_field.send_keys(Keys.ENTER)
+                    print("ENTER sent to search.")
+            else:
+                print("Could not find CPF search field.")
+
+            time.sleep(2)
+
+            codigo = self.find_element(
+                By.XPATH,
+                "//table//tr[td and not(th)][1]/td[1]"
+            )
+
+            if codigo:
+                return codigo.text
+            else:
+                return None
+        except Exception as e:
+            print(f"Error in get_patient_code: {e}")
+            return None
+
+
     def get_patient_history(self, cpf: str):
         """
         Scrapes the patient's appointment history from the website.
@@ -292,3 +374,8 @@ class PatientHistoryScraper(Browser):
         finally:
             print("Closing browser for patient history scraper.")
             self.quit()
+
+if __name__ == "__main__":
+    scraper = PatientHistoryScraper()
+    codigo = scraper.get_patient_code("04320804651")
+    print(codigo)
