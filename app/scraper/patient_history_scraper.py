@@ -109,52 +109,77 @@ class PatientHistoryScraper(Browser):
             print(f"Erro is_last_page: {e}")
             return True
 
-    def get_patient_code(self, cpf: str):
+    def prepare_patient_search(self, force_login=False, patient_type: str ="cpf"):
+        """
+        Navigates to the patient search screen.
+        If force_login is True, it will perform login even if already logged in.
+        """
         try:
-            self._login(medico=None)
+            current_url = self.driver.current_url or ""
+            if force_login or "softclyn.com" not in current_url or "login" in current_url:
+                print(f"Login required (current URL: {current_url}). Logging in...")
+                self._login(medico=None)
+                self._close_modal()
+                self._click_on_appointment_menu()
 
-            self._close_modal()
+                print("Navigating to patient history search screen...")
+                pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
+                prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
+                if prontuario_menu:
+                    try:
+                        prontuario_menu.click()
+                    except:
+                        self.execute_script("arguments[0].click();", prontuario_menu)
 
-            self._click_on_appointment_menu()
-
-            print(f"Navigating to patient history search for CPF: {cpf}")
-
-            pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
-            prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
-            if prontuario_menu:
-                try:
-                    prontuario_menu.click()
-                except:
-                    self.execute_script("arguments[0].click();", prontuario_menu)
-
-            search_patient = self.wait_for_element(
+            search_patient_elem = self.wait_for_element(
                 By.ID,
                 "tipoPesquisaPacienteGrade",
                 expectation=EC.element_to_be_clickable,
+                timeout=20
             )
 
-            if search_patient:
-                select = Select(search_patient)
+            if search_patient_elem:
+                select = Select(search_patient_elem)
+                # Normalize type (e.g., "cpf" -> "Cpf", "nome" -> "Nome")
+                type_normalized = patient_type.capitalize() if patient_type.lower() in ["cpf", "nome"] else patient_type
+                
                 try:
-                    select.select_by_visible_text("Cpf")
+                    select.select_by_visible_text(type_normalized)
                 except:
-                    select.select_by_value("cpf")
-                time.sleep(2)
+                    select.select_by_value(patient_type.lower())
+                
+                time.sleep(1)
+                print(f"Patient search screen ready (type: {type_normalized}).")
+                return True
+            
+            print("Failed to find patient search field 'tipoPesquisaPacienteGrade'.")
+            return False
 
-            print("Entered patient history screen.")
+        except Exception as e:
+            print(f"Error preparing patient search: {e}")
+            return False
 
-            cpf_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
+    def get_patient_by_type(self, type: str, value: str):
+        try:
+            # Ensure we are on the search screen
+            if not self.prepare_patient_search(patient_type=type):
+                print("Failed to prepare patient search screen.")
+                return None
 
-            if cpf_field:
-                cpf_field.clear()
+            print(f"Searching for patient code for type: {type}")
+
+            type_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
+
+            if type_field:
+                type_field.clear()
                 try:
-                    cpf_field.send_keys(cpf)
+                    type_field.send_keys(value)
                 except:
                     self.execute_script(
-                        "arguments[0].value = arguments[1];", cpf_field, cpf
+                        "arguments[0].value = arguments[1];", type_field, value
                     )
 
-                print(f"CPF {cpf} entered in search field.")
+                print(f"Type {type} entered in search field.")
 
                 search_button = self.wait_for_element(
                     By.ID,
@@ -170,24 +195,30 @@ class PatientHistoryScraper(Browser):
                         self.execute_script("arguments[0].click();", search_button)
                     print("Search button clicked.")
                 else:
-                    cpf_field.send_keys(Keys.ENTER)
+                    type_field.send_keys(Keys.ENTER)
                     print("ENTER sent to search.")
             else:
-                print("Could not find CPF search field.")
+                print("Could not find type search field.")
 
-            time.sleep(2)
-
-            codigo = self.find_element(
+            # Specific XPath for the results table cell containing the code
+            # Usually the first column of the first row in the results table
+            codigo_elem = self.find_element(
                 By.XPATH,
-                "//table//tr[td and not(th)][1]/td[1]"
+                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)][1]/td[1]"
             )
 
-            if codigo:
-                return codigo.text
+            if codigo_elem:
+                text = codigo_elem.text.strip()
+                # Verify if it's actually a number to avoid "Caso não encontre..." messages
+                if text.isdigit():
+                    return text
+                else:
+                    print(f"  Found non-numeric text in code field: '{text}'")
+                    return None
             else:
                 return None
         except Exception as e:
-            print(f"Error in get_patient_code: {e}")
+            print(f"Error in get_patient_by_type: {e}")
             return None
 
 
@@ -372,10 +403,9 @@ class PatientHistoryScraper(Browser):
             self.save_screenshot("patient_history_error.png")
             return {"status": "error", "message": str(e)}
         finally:
-            print("Closing browser for patient history scraper.")
-            self.quit()
+            print("History fetch cycle ended.")
 
 if __name__ == "__main__":
     scraper = PatientHistoryScraper()
-    codigo = scraper.get_patient_code("04320804651")
+    codigo = scraper.get_patient_by_type("nome", "Pedro Oliveira")
     print(codigo)

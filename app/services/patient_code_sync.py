@@ -10,39 +10,54 @@ class PatientCodeSyncService:
     def __init__(self):
         self.scraper = PatientHistoryScraper()
 
-    def sync_patient_codes(self) -> dict:
+    def _sync_data(self, search_type: str, items: List[str]) -> dict:
         """
-        Syncs patient codes from website to database.
-        Updates the 'codigo' column for all CPFs in the database.
+        Generic method to sync patient codes by different search types.
         """
         session = get_session()
         try:
-            cpfs = session.query(DadosCliente.cpf).distinct().all()
-            cpfs = [cpf[0] for cpf in cpfs]
+            print(f"Found {len(items)} items to sync codes for using type: {search_type}")
 
-            print(f"Found {len(cpfs)} unique CPFs to sync codes for")
+            # Initialize search screen once
+            if not self.scraper.prepare_patient_search(patient_type=search_type):
+                return {"status": "error", "message": f"Could not initialize patient search screen for {search_type}"}
 
             updated_count = 0
             failed_count = 0
 
-            for i, cpf in enumerate(cpfs, 1):
-                print(f"[{i}/{len(cpfs)}] Processing CPF: {cpf}")
+            for i, value in enumerate(items, 1):
+                print(f"[{i}/{len(items)}] Processing {search_type}: {value}")
 
                 try:
-                    codigo = int(self.scraper.get_patient_code(cpf))
+                    codigo_text = self.scraper.get_patient_by_type(search_type, value)
+                    
+                    # If failed, try to re-prepare search screen Once (session might have expired)
+                    if codigo_text is None:
+                        print("  Search failed, attempting to re-prepare session...")
+                        if self.scraper.prepare_patient_search(force_login=True, patient_type=search_type):
+                            codigo_text = self.scraper.get_patient_by_type(search_type, value)
 
-                    if codigo:
+                    if codigo_text:
+                        codigo = int(codigo_text)
+                        
+                        # Update based on search type
+                        filter_attr = DadosCliente.cpf if search_type == "cpf" else DadosCliente.nomewpp
                         session.query(DadosCliente).filter(
-                            DadosCliente.cpf == cpf
+                            filter_attr == value
                         ).update({"codigo": codigo})
+                        
                         updated_count += 1
                         print(f"  Updated code: {codigo}")
+                        
+                        # Every 10 updates, commit to database to avoid losing progress
+                        if updated_count % 10 == 0:
+                            session.commit()
                     else:
-                        print(f"  No code found for CPF: {cpf}")
+                        print(f"  No code found for {search_type}: {value}")
                         failed_count += 1
 
                 except Exception as e:
-                    print(f"  Error processing CPF {cpf}: {e}")
+                    print(f"  Error processing {search_type} {value}: {e}")
                     failed_count += 1
                     continue
 
@@ -50,7 +65,7 @@ class PatientCodeSyncService:
 
             return {
                 "status": "success",
-                "total_cpfs": len(cpfs),
+                "total_items": len(items),
                 "updated": updated_count,
                 "failed": failed_count,
             }
@@ -60,6 +75,53 @@ class PatientCodeSyncService:
             return {"status": "error", "message": str(e)}
         finally:
             session.close()
+            self.scraper.quit()
+
+    def sync_patient_names(self): 
+        session = get_session()
+        try:
+            names = session.query(DadosCliente.nomewpp).filter(DadosCliente.codigo == None, DadosCliente.cpf == None).all()
+            names = [name[0] for name in names if name[0]]
+        finally:
+            session.close() # Close session before starting the long-running sync
+            
+        return self._sync_data("nome", names)
+
+    def sync_patient_codes(self) -> dict:
+        """
+        Syncs patient codes from website to database using CPF.
+        """
+        session = get_session()
+        try:
+            cpfs = session.query(DadosCliente.cpf).filter(DadosCliente.codigo == None).distinct().all()
+            cpfs = [cpf[0] for cpf in cpfs if cpf[0]]
+        finally:
+            session.close() # Close session before starting the long-running sync
+            
+        return self._sync_data("cpf", cpfs)
+
+    def sync_patient_name(self, nome: str) -> dict:
+        """
+        Syncs patient code for a single name.
+        """
+        session = get_session()
+        try:
+            codigo = self.scraper.get_patient_by_type("nome", nome)
+
+            if codigo:
+                session.query(DadosCliente).filter(DadosCliente.nomewpp == nome).update(
+                    {"codigo": codigo}
+                )
+                session.commit()
+                return {"status": "success", "nome": nome, "codigo": codigo}
+            else:
+                return {"status": "not_found", "nome": nome}
+
+        except Exception as e:
+            session.rollback()
+            return {"status": "error", "nome": nome, "message": str(e)}
+        finally:
+            session.close()
 
     def sync_patient_code(self, cpf: str) -> dict:
         """
@@ -67,7 +129,7 @@ class PatientCodeSyncService:
         """
         session = get_session()
         try:
-            codigo = self.scraper.get_patient_code(cpf)
+            codigo = self.scraper.get_patient_by_type("cpf", cpf)
 
             if codigo:
                 session.query(DadosCliente).filter(DadosCliente.cpf == cpf).update(
@@ -87,5 +149,6 @@ class PatientCodeSyncService:
 
 if __name__ == "__main__":
     sync = PatientCodeSyncService()
-    result = sync.sync_patient_codes()
+    # result = sync.sync_patient_codes()
+    result = sync.sync_patient_names()
     print(result)
