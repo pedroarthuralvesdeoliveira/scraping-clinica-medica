@@ -13,6 +13,7 @@ class NextAppointmentsScraper(Browser):
     def __init__(self):
         super().__init__()
 
+
     def click_on_reports_menu(self):
         menu_relatorios = self.wait_for_element(
             By.ID, "menuRelatoriosLi", expectation=EC.element_to_be_clickable
@@ -36,6 +37,8 @@ class NextAppointmentsScraper(Browser):
             )
 
         time.sleep(2)
+
+        self.save_screenshot("pagina_relatorio_agendamentos.png")
 
         print("Entrou na tela de relatórios de agendamentos.")
 
@@ -310,6 +313,7 @@ class NextAppointmentsScraper(Browser):
                 print(f"Arquivo {file_name} não encontrado.")
         except Exception as e:
             print(f"Erro ao remover arquivo: {e}")
+    
 
     def get_next_appointments(self):
         """
