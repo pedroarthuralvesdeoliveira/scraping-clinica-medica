@@ -1,3 +1,4 @@
+from app.models.enums import SistemaOrigem
 from sqlalchemy import (
     Column,
     BigInteger,
@@ -8,8 +9,9 @@ from sqlalchemy import (
     Time,
     Boolean,
     Numeric,
-    String,
+    String, UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from app.core.database import Base
 
 
@@ -37,3 +39,9 @@ class Agendamento(Base):
     canal_agendamento = Column(Text, nullable=True)
     procedimento = Column(String(255), nullable=True)
     valor = Column(Numeric(10, 2), nullable=True)
+
+    retorno_ate = Column(Date, nullable=True)
+    sistema_origem = Column(
+        PG_ENUM(SistemaOrigem, name='sistema_origem_enum', create_type=False),
+        nullable=False
+    )

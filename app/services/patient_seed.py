@@ -1,181 +1,182 @@
-from app.models.telefones_paciente import TelefonesPaciente
+import re
 from app.core.database import get_session
 from app.models.dados_cliente import DadosCliente
+from app.models.telefones_paciente import TelefonesPaciente
+from app.models.enums import SistemaOrigem
 from app.scraper.get_active_patients import GetActivePatients
-
-import time
-
 
 class PatientSeedService:
     def __init__(self):
         self.scraper = GetActivePatients()
 
     def _extract_phones(self, phone_str: str) -> list[str]:
-        """
-        Recebe uma string suja (ex: "45 9999-8888 / 45 9888-7777")
-        e retorna uma lista de apenas números (ex: ["4599998888", "4598887777"]).
-        """
-        import re
-
         if not phone_str:
             return []
-        
-        # Substitui separadores comuns por um único separador para split
-        # Ex: "123 / 456" -> "123|456"
         normalized = re.sub(r'[;/|\\,]+', '|', str(phone_str))
         parts = normalized.split('|')
-        
         phones = []
         for part in parts:
-            # Mantém apenas dígitos
             digits = "".join(filter(str.isdigit, part))
             if digits:
                 phones.append(digits)
-        
-        # Remove duplicados preservando ordem
         return list(dict.fromkeys(phones))
 
     def seed_patients(self) -> dict:
-        """
-        Scrapes all active patients and seeds them into the database.
-        Then, for each patient without a CPF, searches and updates it.
-        """
-        print("Starting patient seed process...")
+        print("Starting global patient seed process...")
         
-        # 1. Scrape basic info from Excel
-        result = self.scraper.get_all_active_patients()
-
-        if result.get("status") != "success":
-            return result
-
-        patients_data = result.get("patients", [])
-        print(f"Scraped {len(patients_data)} patients. Syncing basic info with database...")
+        # Lista de sistemas para iterar
+        sistemas_para_rodar = [SistemaOrigem.OURO, SistemaOrigem.OF]
+        
+        # Variáveis locais para contagem (Evita erro de tipagem em dicionário misto)
+        grand_total_added = 0
+        grand_total_updated = 0
+        grand_total_phones = 0
+        grand_total_cpfs = 0
+        grand_total_scraped = 0
+        details_by_system = {}
 
         session = get_session()
-        patients_to_sync_cpf = []
-        
+
         try:
-            added_count = 0
-            updated_count = 0
-            phones_added_count = 0
-
-            for patient_dict in patients_data:
-                codigo_str = patient_dict.get("codigo")
-                if not codigo_str:
-                    continue
+            for sistema_enum in sistemas_para_rodar:
+                sistema_str = sistema_enum.value
+                print(f"\n--- Processando Sistema: {sistema_str.upper()} ---")
                 
-                try:
-                    codigo = int(codigo_str)
-                except ValueError:
+                # 1. Configura e Loga no Sistema Correto
+                self.scraper.set_sistema(sistema_str)
+                
+                result = self.scraper.get_all_active_patients()
+
+                if result.get("status") != "success":
+                    print(f"Erro ao baixar do sistema {sistema_str}: {result.get('message')}")
                     continue
 
-                existing_patient = session.query(DadosCliente).filter_by(codigo=codigo).first()
+                patients_data = result.get("patients", [])
+                count_scraped = len(patients_data)
+                print(f"Scraped {count_scraped} patients from {sistema_str}.")
+                
+                # Acumula no total geral
+                grand_total_scraped += count_scraped
+                
+                sys_added = 0
+                sys_updated = 0
+                sys_phones = 0
+                patients_to_sync_cpf = []
 
-                raw_nomewpp = patient_dict.get("nomewpp")
-                raw_cad_telefone = patient_dict.get("cad_telefone")
-                extracted_phones = self._extract_phones(raw_cad_telefone)
+                for patient_dict in patients_data:
+                    codigo_str = patient_dict.get("codigo")
+                    if not codigo_str:
+                        continue
+                    try:
+                        codigo = int(codigo_str)
+                    except ValueError:
+                        continue
 
-                formatted_wpp = None
-                if extracted_phones:
-                    primeiro_numero = extracted_phones[0]
-                    formatted_wpp = f"55{primeiro_numero}@s.whatsapp.net"
-
-                if existing_patient:
-                    existing_patient.nomewpp = patient_dict.get("nomewpp")
-                    existing_patient.cad_telefone = raw_cad_telefone
-                    updated_count += 1
-                else:
-                    new_patient = DadosCliente(
-                        codigo=codigo,
-                        nomewpp=raw_nomewpp,
-                        cad_telefone=raw_cad_telefone,
-                        telefone=formatted_wpp,
-                        atendimento_ia="MarcIA",
-                        setor="Geral"
-                    )
-                    session.add(new_patient)
-                    added_count += 1
-                    existing_patient = new_patient
-
-                session.flush()
-
-                for i, phone_num in enumerate(extracted_phones):
-                    # Verifica se esse número já existe para este paciente
-                    phone_exists = session.query(TelefonesPaciente).filter_by(
-                        cliente_codigo=existing_patient.id,
-                        numero=phone_num
+                    existing_patient = session.query(DadosCliente).filter_by(
+                        codigo=codigo, 
+                        sistema_origem=sistema_enum
                     ).first()
 
-                    if not phone_exists:
-                        # Define tipo básico e se é principal
-                        # Lógica simples: Se tem 10+ dígitos (DDD+N), assume celular/whatsapp.
-                        tipo = "whatsapp" if len(phone_num) >= 10 else "telefone fixo"
-                        # O primeiro número encontrado será o principal se ainda não houver nenhum
-                        is_principal = (i == 0)
+                    raw_nomewpp = patient_dict.get("nomewpp")
+                    raw_cad_telefone = patient_dict.get("cad_telefone")
+                    extracted_phones = self._extract_phones(raw_cad_telefone)
 
-                        new_phone = TelefonesPaciente(
-                            cliente_codigo=existing_patient.id,
-                            numero=phone_num,
-                            tipo=tipo,
-                            is_principal=is_principal
+                    formatted_wpp = None
+                    if extracted_phones:
+                        formatted_wpp = f"55{extracted_phones[0]}@s.whatsapp.net"
+
+                    if existing_patient:
+                        existing_patient.nomewpp = raw_nomewpp
+                        existing_patient.cad_telefone = raw_cad_telefone
+                        sys_updated += 1
+                    else:
+                        new_patient = DadosCliente(
+                            codigo=codigo,
+                            sistema_origem=sistema_enum, 
+                            nomewpp=raw_nomewpp,
+                            cad_telefone=raw_cad_telefone,
+                            telefone=formatted_wpp,
+                            atendimento_ia="MarcIA",
+                            setor="Geral"
                         )
-                        session.add(new_phone)
-                        phones_added_count += 1
+                        session.add(new_patient)
+                        sys_added += 1
+                        existing_patient = new_patient
 
-                # If CPF is missing, mark for sync
-                if not existing_patient.cpf:
-                    patients_to_sync_cpf.append(existing_patient.codigo)
+                    session.flush() # Para ter o ID
 
-            session.commit()
-            print(f"Basic info sync completed: {added_count} added, {updated_count} updated.")
+                    for i, phone_num in enumerate(extracted_phones):
+                        phone_exists = session.query(TelefonesPaciente).filter_by(
+                            cliente_codigo=existing_patient.id,
+                            numero=phone_num
+                        ).first()
 
-            # 2. Sync CPFs for those missing
-            if patients_to_sync_cpf:
-                print(f"Starting CPF synchronization for {len(patients_to_sync_cpf)} patients...")
+                        if not phone_exists:
+                            tipo = "whatsapp" if len(phone_num) >= 10 else "telefone fixo"
+                            new_phone = TelefonesPaciente(
+                                cliente_codigo=existing_patient.id,
+                                numero=phone_num,
+                                tipo=tipo,
+                                is_principal=(i == 0)
+                            )
+                            session.add(new_phone)
+                            sys_phones += 1
+
+                    if not existing_patient.cpf:
+                        patients_to_sync_cpf.append(existing_patient.codigo)
+
+                session.commit()
                 
-                if self.scraper.prepare_patient_registration_search():
-                    cpf_updated_count = 0
+                grand_total_added += sys_added
+                grand_total_updated += sys_updated
+                grand_total_phones += sys_phones
+                
+                details_by_system[sistema_str] = {
+                    "added": sys_added, 
+                    "updated": sys_updated,
+                    "phones": sys_phones
+                }
+                
+                print(f"Sync {sistema_str} concluído: {sys_added} novos, {sys_updated} atualizados.")
+
+                if patients_to_sync_cpf:
+                    print(f"Iniciando busca de CPF para {len(patients_to_sync_cpf)} pacientes em {sistema_str}...")
                     
-                    for i, code in enumerate(patients_to_sync_cpf, 1):
-                        print(f"[{i}/{len(patients_to_sync_cpf)}] Fetching CPF for code: {code}")
-                        cpf = self.scraper.get_cpf_by_code(str(code))
-                        
-                        if cpf:
-                            # Update in DB
-                            db_patient = session.query(DadosCliente).filter_by(codigo=code).first()
-                            if db_patient:
-                                db_patient.cpf = cpf
-                                cpf_updated_count += 1
-                                print(f"  CPF encontrado e atualizado: {cpf}")
+                    if self.scraper.prepare_patient_registration_search():
+                        sys_cpf_updated = 0
+                        for i, code in enumerate(patients_to_sync_cpf, 1):
+                            cpf = self.scraper.get_cpf_by_code(str(code))
+                            if cpf:
+                                db_patient = session.query(DadosCliente).filter_by(
+                                    codigo=code, 
+                                    sistema_origem=sistema_enum
+                                ).first()
                                 
-                                # Periodical commit
-                                if cpf_updated_count % 10 == 0:
-                                    session.commit()
-                                    print("  Commit periódico realizado.")
-                        else:
-                            print(f"  CPF não encontrado para o código: {code}")
+                                if db_patient:
+                                    db_patient.cpf = cpf
+                                    sys_cpf_updated += 1
+                                    if sys_cpf_updated % 10 == 0:
+                                        session.commit()
+                        
+                        session.commit()
+                        grand_total_cpfs += sys_cpf_updated
+                        print(f"CPFs atualizados em {sistema_str}: {sys_cpf_updated}")
 
-                    session.commit()
-                    print(f"CPF synchronization completed: {cpf_updated_count} CPFs updated.")
-
+            # Retorna o dicionário completo apenas no final
             return {
                 "status": "success",
-                "added": added_count,
-                "updated": updated_count,
-                "cpfs_updated": cpf_updated_count if 'cpf_updated_count' in locals() else 0,
-                "total": len(patients_data),
+                "added": grand_total_added,
+                "updated": grand_total_updated,
+                "phones_added": grand_total_phones,
+                "cpfs_updated": grand_total_cpfs,
+                "total_scraped": grand_total_scraped,
+                "details_by_system": details_by_system
             }
 
         except Exception as e:
             session.rollback()
-            print(f"Error during seed/sync: {e}")
+            print(f"Critical error: {e}")
             return {"status": "error", "message": str(e)}
         finally:
             session.close()
             self.scraper.quit()
-
-
-if __name__ == "__main__":
-    service = PatientSeedService()
-    result = service.seed_patients()
-    print(result)

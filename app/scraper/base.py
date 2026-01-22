@@ -51,6 +51,11 @@ class Browser:
         self.driver.implicitly_wait(10)
         self.settings = get_settings()
         self.is_softclyn_of = False
+        self.current_system = "ouro" 
+
+    def set_sistema(self, sistema: str):
+        """Define qual sistema será acessado no próximo login."""
+        self.current_system = sistema
 
     def get(self, url, timeout=60):
         self.driver.set_page_load_timeout(timeout)
@@ -167,7 +172,10 @@ class Browser:
             print(f"Ocorreu outro erro: {e}")
             raise
 
-    def _login(self, medico: str | None = None):
+    def _login(
+        self, 
+        medico: str | None = None, 
+    ):
         """
         Realiza o login no sistema Softclyn.
         """
@@ -175,18 +183,32 @@ class Browser:
             URL = self.settings.softclyn_url
             LOGIN = self.settings.softclyn_login_page
 
-            medicos_softclyn_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+            sistema_sufixo = f"_{self.current_system}"
 
-            URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
+            # URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
 
             if medico:
+                medicos_softclyn_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
                 medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
+
+                sistema_sufixo = f"{self.settings.softclyn_empresa}_ouro"
 
                 for dr in medicos_softclyn_of:
                     if medico_limpo.upper() in dr.upper():
-                        URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+                       #  URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+                        sistema_sufixo = "_of"
                         self.is_softclyn_of = True
                         break
+
+                if "_of" in sistema_sufixo:
+                     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+                else:
+                     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
+            else: 
+                URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_{self.current_system}/{LOGIN}"
+            # if is_softclyn_of:
+            #     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+            #     self.is_softclyn_of = True
 
             print(f"Navigating to: {URL_BASE}")
             self.get(URL_BASE, timeout=self.settings.page_load_timeout)
