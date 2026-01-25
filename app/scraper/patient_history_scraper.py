@@ -222,7 +222,7 @@ class PatientHistoryScraper(Browser):
             return None
 
 
-    def get_patient_history(self, cpf: str):
+    def get_patient_history(self, identifier: str, search_type: str = "cpf"):
         """
         Scrapes the patient's appointment history from the website.
         Returns a list of appointment dictionaries.
@@ -234,7 +234,7 @@ class PatientHistoryScraper(Browser):
 
             self._click_on_appointment_menu()
 
-            print(f"Navigating to patient history search for CPF: {cpf}")
+            print(f"Navigating to patient history search for {search_type.upper()}: {identifier}")
 
             pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
             prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
@@ -252,27 +252,36 @@ class PatientHistoryScraper(Browser):
 
             if search_patient:
                 select = Select(search_patient)
+                # Normalize type for select
+                type_map = {
+                    "cpf": "Cpf",
+                    "nome": "Nome",
+                    "codigo": "Código",
+                    "prontuario": "Prontuário"
+                }
+                visible_text = type_map.get(search_type.lower(), search_type.capitalize())
+                
                 try:
-                    select.select_by_visible_text("Cpf")
+                    select.select_by_visible_text(visible_text)
                 except:
-                    select.select_by_value("cpf")
+                    # Fallback to value if text fails (values are usually lowercase)
+                    select.select_by_value(search_type.lower())
                 time.sleep(2)
 
             print("Entered patient history screen.")
 
-            cpf_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
+            search_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
 
-            if cpf_field:
-                cpf_field.clear()
+            if search_field:
+                search_field.clear()
                 try:
-                    cpf_field.send_keys(cpf)
+                    search_field.send_keys(identifier)
                 except:
                     self.execute_script(
-                        "arguments[0].value = arguments[1];", cpf_field, cpf
+                        "arguments[0].value = arguments[1];", search_field, identifier
                     )
 
-                print(f"CPF {cpf} entered in search field.")
-                # self.save_screenshot("patient_history_cpf_entered.png")
+                print(f"{search_type.capitalize()} {identifier} entered in search field.")
 
                 search_button = self.wait_for_element(
                     By.ID,
@@ -288,10 +297,10 @@ class PatientHistoryScraper(Browser):
                         self.execute_script("arguments[0].click();", search_button)
                     print("Search button clicked.")
                 else:
-                    cpf_field.send_keys(Keys.ENTER)
+                    search_field.send_keys(Keys.ENTER)
                     print("ENTER sent to search.")
             else:
-                print("Could not find CPF search field.")
+                print(f"Could not find search field for {search_type}.")
 
             time.sleep(2)
 
@@ -311,6 +320,7 @@ class PatientHistoryScraper(Browser):
             time.sleep(0.5)
 
             appointments = []
+            ignore_words = ["EXCLUÍDO POR", "DESMARCOU", "FALTOU"]
             today_string = datetime.now().strftime("%d/%m/%Y")
             today = datetime.strptime(today_string, "%d/%m/%Y")
             max_pages = 100
@@ -330,15 +340,6 @@ class PatientHistoryScraper(Browser):
                 )
 
                 for table in tables:
-                    # profissional = "Desconhecido"
-
-                    # profissional = (
-                    #     self.wait_for_element(
-                    #         By.XPATH, ".//td[contains(@class,'active')]//strong"
-                    #     )
-                    #     .text.replace("Profissional / Agenda:", "")
-                    #     .strip()
-                    # )
                     prof_elem = table.find_elements(By.XPATH, ".//td[contains(@class,'active')]//strong")
                     profissional = prof_elem[0].text.replace("Profissional / Agenda:", "").strip() if prof_elem else "Desconhecido"
                     print(f"Found profissional: {profissional}")
@@ -356,7 +357,7 @@ class PatientHistoryScraper(Browser):
 
                         dta_atend = colunas[0].text.strip()
 
-                        if "EXCLUÍDO POR" in dta_atend:  # cancelado
+                        if any(word in dta_atend for word in ignore_words):
                             continue
 
                         dta_atend_date = datetime.strptime(dta_atend, "%d/%m/%Y")
@@ -377,9 +378,6 @@ class PatientHistoryScraper(Browser):
                                 "retorno_ate": colunas[7].text.strip(),
                             }
                         )
-
-                # if self.is_last_page():
-                #     break
                 
                 if not self.go_to_next_page():
                     # print("Falha na navegação. Encerrando loop.")
@@ -387,11 +385,11 @@ class PatientHistoryScraper(Browser):
                 
 
             if len(appointments) == 0:
-                print(f"No appointments found for CPF {cpf}.")
+                print(f"No appointments found for {search_type.upper()} {identifier}.")
                 self.save_screenshot("patient_history_no_appointments.png")
                 return {"status": "success", "appointments": []}
 
-            print(f"Found {len(appointments)} appointments for CPF {cpf}.")
+            print(f"Found {len(appointments)} appointments for {search_type.upper()} {identifier}.")
             return {"status": "success", "appointments": appointments}
 
         except TimeoutException as e:
