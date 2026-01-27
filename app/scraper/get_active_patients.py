@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
+import glob
 from datetime import datetime
 import pandas as pd
 
@@ -13,36 +14,60 @@ class GetActivePatients(Browser):
     def __init__(self):
         super().__init__()
 
-    def capture_cpf(self):
+    def capture_data(self, data_type: str, header_value: str):
+        """
+        Captures data from the first row of a table based on column header.
+        
+        Args:
+            data_type (str): The type of data being captured (e.g., 'telefone', 'cpf', 'celular')
+            header_value (str): The header text to search for (e.g., 'Telefone', 'CPF', 'Celular')
+        
+        Returns:
+            str or None: The captured data from the table or None if not found
+        """
         try:
             # Wait for table to update
             time.sleep(1.5)
             tabela = self.wait_for_element(By.CSS_SELECTOR, "table.tableFiltro", timeout=5)
             if not tabela:
-                print("  Tabela de resultados não encontrada.")
+                print(f"  Tabela de resultados não encontrada.")
                 return None
 
-            # Descobre o índice da coluna "CPF"
+            # Find the column index based on header text
             cabecalhos = tabela.find_elements(By.XPATH, ".//thead/tr/th")
-            indice_cpf = None
+            indice_coluna = None
             for i, th in enumerate(cabecalhos, start=1):
-                if "CPF" in th.text.strip().upper():
-                    indice_cpf = i
+                if header_value.upper() in th.text.strip().upper():
+                    indice_coluna = i
                     break
 
-            if indice_cpf is None:
+            if indice_coluna is None:
+                print(f"  Coluna '{header_value}' não encontrada.")
                 return None
 
             try:
                 # Get the first row
                 linha = tabela.find_element(By.XPATH, ".//tbody/tr[1]")
-                cpf_td = linha.find_element(By.XPATH, f"./td[{indice_cpf}]")
-                return cpf_td.text.strip()
-            except:
+                data_td = linha.find_element(By.XPATH, f"./td[{indice_coluna}]")
+                valor_capturado = data_td.text.strip()
+                print(f"  {data_type.capitalize()} encontrado na tabela: {valor_capturado}")
+                return valor_capturado
+            except Exception as e:
+                print(f"  Erro ao extrair dados da célula: {e}")
                 return None
         except Exception as e:
-            print(f"  Erro ao capturar CPF: {e}")
+            print(f"  Erro ao capturar {data_type}: {e}")
             return None
+
+    def capture_phone(self, cell_phone: bool = False):
+        """Captura o telefone da primeira linha da tabela de resultados."""
+        if cell_phone:
+            return self.capture_data("celular", "Celular")
+        return self.capture_data("telefone", "Telefone")
+
+    def capture_cpf(self):
+        """Captura o CPF da primeira linha da tabela de resultados."""
+        return self.capture_data("cpf", "CPF")
 
     def prepare_patient_registration_search(self):
         """
@@ -93,11 +118,11 @@ class GetActivePatients(Browser):
 
             time.sleep(2)
             
-            # self.save_screenshot("patient_search_screen.png")
             
             # Verify if modal opened
             if self.wait_for_element(By.ID, "pesquisa2", timeout=10):
                 print("Modal de pesquisa aberto com sucesso.")
+                self.save_screenshot("patient_search_screen.png")
                 return True
             
             print("Falha ao abrir o modal de pesquisa (pesquisa2 não encontrado).")
@@ -107,6 +132,65 @@ class GetActivePatients(Browser):
             print(f"Erro ao preparar busca: {e}")
             return False
 
+    def get_phone_by_code(self, patient_code: str):
+        """
+        Searches for a patient by code and returns their CPF.
+        """
+        try:
+            input_pesquisa2 = self.wait_for_element(
+                By.ID, 
+                "pesquisa2"
+            )
+            if not input_pesquisa2:
+                print("  Modal parece estar fechado. Tentando reabrir...")
+                if not self.prepare_patient_registration_search():
+                    return None
+                input_pesquisa2 = self.wait_for_element(By.ID, "pesquisa2", timeout=5)
+
+            if not input_pesquisa2:
+                print("  Não foi possível encontrar o campo 'pesquisa2'.")
+                return None
+
+            try:
+                input_pesquisa2.clear()
+            except:
+                self.execute_script("arguments[0].value = '';", input_pesquisa2)
+
+            time.sleep(1)
+
+            try:
+                input_pesquisa2.send_keys(patient_code)
+            except:
+                self.execute_script("arguments[0].value = arguments[1];", input_pesquisa2, patient_code)
+            
+            time.sleep(1)
+
+            try:
+                input_pesquisa2.send_keys(Keys.ENTER)
+            except:
+                self.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true}));", input_pesquisa2)
+            
+            time.sleep(1)
+            
+            # Tenta capturar telefone, se vazio tenta celular
+            phone_raw = self.capture_phone()
+            if not phone_raw:  # Captura strings vazias e None
+                phone_raw = self.capture_phone(cell_phone=True)
+            
+            print(f"  Telefone bruto capturado: {phone_raw}")
+            if phone_raw:
+                phone_clean = "".join(filter(str.isdigit, phone_raw))
+                print(f"  Telefone limpo: {phone_clean}")
+                return phone_clean if len(phone_clean) >= 10 else None
+                
+            return None
+
+        except Exception as e:
+            print(f"Erro na busca por código {patient_code}: {e}")
+            self.save_screenshot(f"erro_busca_{patient_code}.png")
+            return None
+    
+    
     def get_cpf_by_code(self, patient_code: str):
         """
         Searches for a patient by code and returns their CPF.
@@ -180,7 +264,6 @@ class GetActivePatients(Browser):
 
         time.sleep(2)
 
-
     def click_on_active_patients(self):
         search_patient = self.wait_for_element(
                 By.ID,
@@ -227,10 +310,17 @@ class GetActivePatients(Browser):
         try:
             time.sleep(5)
             folder_path = (
-                "/home/pedro/freelas/backend/scraping-clinica-medica/app/scraper/data"
+                "/home/pedro/freelas/visualsoft/scraping-clinica-medica/app/scraper/data"
             )
-            file_name = "26relatorio.xls"
-            full_path = os.path.join(folder_path, file_name)
+            xls_files = glob.glob(os.path.join(folder_path, "*.xls"))
+            if not xls_files:
+                return {
+                    "status": "error",
+                    "message": "No .xls file found in the folder.",
+                }
+            # Use the first .xls file found
+            full_path = xls_files[0]
+            print(f"Using Excel file: {os.path.basename(full_path)}")
             df = pd.read_excel(full_path, engine="calamine")
 
             df.columns = [str(c).strip() for c in df.columns]
@@ -269,6 +359,7 @@ class GetActivePatients(Browser):
                 "status": "success",
                 "patients": patients,
                 "total_count": len(patients),
+                "file_path": full_path,
             }
 
         except Exception as e:
@@ -278,18 +369,13 @@ class GetActivePatients(Browser):
                 "message": "Falha ao obter dados do Excel.",
             }
 
-    def remove_excel_file(self):
+    def remove_excel_file(self, file_path):
         try:
-            folder_path = (
-                "/home/pedro/freelas/backend/scraping-clinica-medica/app/scraper/data"
-            )
-            file_name = "26relatorio.xls"
-            full_path = os.path.join(folder_path, file_name)
-            if os.path.exists(full_path):
-                os.remove(full_path)
-                print(f"Arquivo {file_name} removido com sucesso.")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Arquivo {os.path.basename(file_path)} removido com sucesso.")
             else:
-                print(f"Arquivo {file_name} não encontrado.")
+                print(f"Arquivo {os.path.basename(file_path)} não encontrado.")
         except Exception as e:
             print(f"Erro ao remover arquivo: {e}")
 
@@ -316,7 +402,7 @@ class GetActivePatients(Browser):
             if result.get("status") != "success":
                 return result
 
-            self.remove_excel_file()
+            self.remove_excel_file(result.get("file_path"))
 
             return {
                 "status": "success",

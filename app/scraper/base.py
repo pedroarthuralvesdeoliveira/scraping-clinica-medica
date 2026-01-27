@@ -183,7 +183,7 @@ class Browser:
             URL = self.settings.softclyn_url
             LOGIN = self.settings.softclyn_login_page
 
-            sistema_sufixo = f"_{self.current_system}"
+            sistema_sufixo = f"_{self.current_system.lower()}"
 
             # URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
 
@@ -191,7 +191,7 @@ class Browser:
                 medicos_softclyn_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
                 medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
 
-                sistema_sufixo = f"{self.settings.softclyn_empresa}_ouro"
+                sistema_sufixo = f"{self.settings.softclyn_empresa}_{self.current_system.lower()}"
 
                 for dr in medicos_softclyn_of:
                     if medico_limpo.upper() in dr.upper():
@@ -203,9 +203,9 @@ class Browser:
                 if "_of" in sistema_sufixo:
                      URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
                 else:
-                     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
+                     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_{self.current_system.lower()}/{LOGIN}"
             else: 
-                URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_{self.current_system}/{LOGIN}"
+                URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_{self.current_system.lower()}/{LOGIN}"
             # if is_softclyn_of:
             #     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
             #     self.is_softclyn_of = True

@@ -1,13 +1,15 @@
 import re
 from app.core.database import get_session
 from app.models.dados_cliente import DadosCliente
-from app.models.telefones_paciente import TelefonesPaciente
 from app.models.enums import SistemaOrigem
+from app.models.telefones_paciente import TelefonesPaciente
 from app.scraper.get_active_patients import GetActivePatients
+# from app.scraper.patient_history_scraper import PatientHistoryScraper
 
 class PatientSeedService:
     def __init__(self):
         self.scraper = GetActivePatients()
+        # self.history_scraper = PatientHistoryScraper()
 
     def _extract_phones(self, phone_str: str) -> list[str]:
         if not phone_str:
@@ -31,7 +33,7 @@ class PatientSeedService:
         grand_total_added = 0
         grand_total_updated = 0
         grand_total_phones = 0
-        grand_total_cpfs = 0
+        # grand_total_cpfs = 0
         grand_total_scraped = 0
         details_by_system = {}
 
@@ -40,7 +42,7 @@ class PatientSeedService:
         try:
             for sistema_enum in sistemas_para_rodar:
                 sistema_str = sistema_enum.value
-                print(f"\n--- Processando Sistema: {sistema_str.upper()} ---")
+                print(f"\n--- Processando Sistema: {sistema_str} ---")
                 
                 # 1. Configura e Loga no Sistema Correto
                 self.scraper.set_sistema(sistema_str)
@@ -61,7 +63,7 @@ class PatientSeedService:
                 sys_added = 0
                 sys_updated = 0
                 sys_phones = 0
-                patients_to_sync_cpf = []
+                patients_to_sync_phone = []
 
                 for patient_dict in patients_data:
                     codigo_str = patient_dict.get("codigo")
@@ -72,9 +74,11 @@ class PatientSeedService:
                     except ValueError:
                         continue
 
+                    print(f"Processing patient: {codigo} - {sistema_str}")
+
                     existing_patient = session.query(DadosCliente).filter_by(
                         codigo=codigo, 
-                        sistema_origem=sistema_enum
+                        sistema_origem=sistema_enum.value
                     ).first()
 
                     raw_nomewpp = patient_dict.get("nomewpp")
@@ -92,7 +96,7 @@ class PatientSeedService:
                     else:
                         new_patient = DadosCliente(
                             codigo=codigo,
-                            sistema_origem=sistema_enum, 
+                            sistema_origem=sistema_enum.value, 
                             nomewpp=raw_nomewpp,
                             cad_telefone=raw_cad_telefone,
                             telefone=formatted_wpp,
@@ -122,10 +126,10 @@ class PatientSeedService:
                             session.add(new_phone)
                             sys_phones += 1
 
-                    if not existing_patient.cpf:
-                        patients_to_sync_cpf.append(existing_patient.codigo)
+                    if not existing_patient.cad_telefone:
+                        patients_to_sync_phone.append(existing_patient.codigo)
 
-                session.commit()
+                    session.commit()  # Commit after each patient to avoid connection issues
                 
                 grand_total_added += sys_added
                 grand_total_updated += sys_updated
@@ -139,28 +143,28 @@ class PatientSeedService:
                 
                 print(f"Sync {sistema_str} concluído: {sys_added} novos, {sys_updated} atualizados.")
 
-                if patients_to_sync_cpf:
-                    print(f"Iniciando busca de CPF para {len(patients_to_sync_cpf)} pacientes em {sistema_str}...")
+                if patients_to_sync_phone:
+                    print(f"Iniciando busca de telefone para {len(patients_to_sync_phone)} pacientes em {sistema_str}...")
                     
                     if self.scraper.prepare_patient_registration_search():
-                        sys_cpf_updated = 0
-                        for i, code in enumerate(patients_to_sync_cpf, 1):
-                            cpf = self.scraper.get_cpf_by_code(str(code))
-                            if cpf:
+                        sys_phone_updated = 0
+                        for i, code in enumerate(patients_to_sync_phone, 1):
+                            phone = self.scraper.get_phone_by_code(str(code))
+                            if phone:
                                 db_patient = session.query(DadosCliente).filter_by(
                                     codigo=code, 
-                                    sistema_origem=sistema_enum
+                                    sistema_origem=sistema_enum.value
                                 ).first()
                                 
                                 if db_patient:
-                                    db_patient.cpf = cpf
-                                    sys_cpf_updated += 1
-                                    if sys_cpf_updated % 10 == 0:
+                                    db_patient.cad_telefone = phone
+                                    sys_phone_updated += 1
+                                    if sys_phone_updated % 10 == 0:
                                         session.commit()
                         
                         session.commit()
-                        grand_total_cpfs += sys_cpf_updated
-                        print(f"CPFs atualizados em {sistema_str}: {sys_cpf_updated}")
+                        grand_total_phones += sys_phone_updated
+                        print(f"Telefones atualizados em {sistema_str}: {sys_phone_updated}")
 
             # Retorna o dicionário completo apenas no final
             return {
@@ -168,7 +172,7 @@ class PatientSeedService:
                 "added": grand_total_added,
                 "updated": grand_total_updated,
                 "phones_added": grand_total_phones,
-                "cpfs_updated": grand_total_cpfs,
+                # "cpfs_updated": grand_total_cpfs,
                 "total_scraped": grand_total_scraped,
                 "details_by_system": details_by_system
             }

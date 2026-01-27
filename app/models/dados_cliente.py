@@ -25,7 +25,6 @@ class DadosCliente(Base):
     data_nascimento = Column(Date, nullable=True)
     cad_telefone = Column(String(20), nullable=True)
     codigo = Column(SmallInteger, nullable=True)
-    telefone = Column(String(20), nullable=True)
     sistema_origem = Column(
         PG_ENUM(SistemaOrigem, name="sistema_origem_enum", create_type=False),
         nullable=False,

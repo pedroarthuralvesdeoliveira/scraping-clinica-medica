@@ -1,3 +1,4 @@
+from sqlalchemy.orm import Mapped, mapped_column
 from app.models.enums import SistemaOrigem
 from sqlalchemy import (
     Column,
@@ -13,6 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from app.core.database import Base
+from datetime import date
 
 
 class Agendamento(Base):
@@ -29,7 +31,7 @@ class Agendamento(Base):
     data_nascimento = Column(Date, nullable=True)
     especialidade = Column(Text, nullable=True)
     profissional = Column(Text, nullable=True)
-    data_consulta = Column(Date, nullable=False)
+    data_consulta: Mapped[date] = mapped_column(Date, nullable=False)
     hora_consulta = Column(Time, nullable=False)
     status = Column(Text, nullable=True)
     observacoes = Column(Text, nullable=True)
