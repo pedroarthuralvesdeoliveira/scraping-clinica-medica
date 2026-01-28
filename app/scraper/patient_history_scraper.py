@@ -243,6 +243,8 @@ class PatientHistoryScraper(Browser):
                     prontuario_menu.click()
                 except:
                     self.execute_script("arguments[0].click();", prontuario_menu)
+            
+            time.sleep(1)
 
             search_patient = self.wait_for_element(
                 By.ID,
@@ -274,6 +276,7 @@ class PatientHistoryScraper(Browser):
 
             if search_field:
                 search_field.clear()
+                time.sleep(1)
                 try:
                     search_field.send_keys(identifier)
                 except:

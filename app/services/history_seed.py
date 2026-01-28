@@ -1,3 +1,4 @@
+from app.services.doctor_service import get_or_create_professional
 import time
 from datetime import datetime
 from app.core.database import get_session
@@ -72,11 +73,15 @@ class AppointmentHistoryService:
                                 print(f"Date/Time parse error: {ve}")
                                 continue
 
+                            prof_name = apt_data.get("profissional")
+                            # TODO: baixar médicos por relatório cadastro de profissionais e relacionar aqui
+                            prof_id = get_or_create_professional(session, prof_name, sistema_enum)  
+
                             # Check for duplicates based on client, date, time
                             exists = session.query(Agendamento).filter_by(
                                 id_cliente=patient.id,
                                 data_consulta=data_consulta,
-                                hora_consulta=hora_consulta
+                                hora_consulta=hora_consulta,
                             ).first()
 
                             if exists:
@@ -95,19 +100,20 @@ class AppointmentHistoryService:
                             # Create new appointment
                             new_apt = Agendamento(
                                 id_cliente=patient.id,
+                                id_profissional=prof_id,
                                 sistema_origem=sistema_enum,
-                                codigo=patient.codigo, # Redundant but compliant with schema
                                 
                                 # Denormalized fields from Patient
                                 cpf=patient.cpf,
                                 telefone=patient.cad_telefone or patient.telefone,
                                 nome_paciente=patient.nomewpp, # Fallback name
                                 data_nascimento=patient.data_nascimento,
+                                profissional=prof_name,
                                 
                                 # Scraped fields
                                 data_consulta=data_consulta,
                                 hora_consulta=hora_consulta,
-                                profissional=apt_data.get("profissional"),
+                                # profissional=apt_data.get("profissional"),
                                 procedimento=apt_data.get("tipo"), # Mapping 'tipo' to 'procedimento' or 'especialidade'? Schema has both.
                                 # 'tipo' in scraper seems to be like "CONSULTA", "RETORNO", etc.
                                 # 'especialidade' is NOT in scraper data. 

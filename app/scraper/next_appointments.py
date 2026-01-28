@@ -205,7 +205,7 @@ class NextAppointmentsScraper(Browser):
     def get_excel_data(self):
         try:
             folder_path = (
-                "/home/pedro/freelas/backend/scraping-clinica-medica/app/scraper/data"
+                "/home/pedro/freelas/visualsoft/scraping-clinica-medica/app/scraper/data"
             )
             file_name = "26relatorio.xls"
             full_path = os.path.join(folder_path, file_name)
@@ -302,7 +302,7 @@ class NextAppointmentsScraper(Browser):
     def remove_excel_file(self):
         try:
             folder_path = (
-                "/home/pedro/freelas/backend/scraping-clinica-medica/app/scraper/data"
+                "/home/pedro/freelas/visualsoft/scraping-clinica-medica/app/scraper/data"
             )
             file_name = "26relatorio.xls"
             full_path = os.path.join(folder_path, file_name)
