@@ -3,15 +3,19 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from ...core.dependencies import get_api_key
 from ..schemas.common import CancelPayload, SchedulePayload, VerifyPayload, SyncPayload
+from ..schemas.responses import TaskQueuedResponse, TaskStatusResponse
 from ...worker.celery_app import celery
 
 router = APIRouter()
 
 
 @router.post(
-    "/schedule", dependencies=[Depends(get_api_key)], summary="Agendar consulta"
+    "/schedule",
+    dependencies=[Depends(get_api_key)],
+    summary="Agendar consulta",
+    response_model=TaskQueuedResponse
 )
-def api_schedule(payload: SchedulePayload):
+def api_schedule(payload: SchedulePayload) -> TaskQueuedResponse:
     """
     Recebe um JSON do N8N e agenda uma consulta.
     """
@@ -39,13 +43,16 @@ def api_schedule(payload: SchedulePayload):
         ],
     )
 
-    return {"status": "tarefa_enfileirada", "task_id": task.id}
+    return TaskQueuedResponse(task_id=task.id)
 
 
 @router.post(
-    "/cancel", dependencies=[Depends(get_api_key)], summary="Cancelar consulta"
+    "/cancel",
+    dependencies=[Depends(get_api_key)],
+    summary="Cancelar consulta",
+    response_model=TaskQueuedResponse
 )
-def api_cancel(payload: CancelPayload):
+def api_cancel(payload: CancelPayload) -> TaskQueuedResponse:
     """
     Recebe um JSON do N8N e cancela uma consulta.
     """
@@ -64,15 +71,16 @@ def api_cancel(payload: CancelPayload):
         ],
     )
 
-    return {"status": "tarefa_enfileirada", "task_id": task.id}
+    return TaskQueuedResponse(task_id=task.id)
 
 
 @router.get(
     "/availability",
     dependencies=[Depends(get_api_key)],
     summary="Verificar disponibilidade de consulta",
+    response_model=TaskQueuedResponse
 )
-def api_check_availability(payload: VerifyPayload = Depends()):
+def api_check_availability(payload: VerifyPayload = Depends()) -> TaskQueuedResponse:
     """
     Verifica a disponibilidade.
     Ex: /availability?medico=Dr.Nome&data_desejada=25/10/2025&horario_desejado=14:00
@@ -91,36 +99,45 @@ def api_check_availability(payload: VerifyPayload = Depends()):
         ],
     )
 
-    return {"status": "tarefa_enfileirada", "task_id": task.id}
+    return TaskQueuedResponse(task_id=task.id)
 
 
-@router.get("/task_status/{task_id}", summary="Verificar status de uma tarefa Celery")
-def get_task_status(task_id: str):
+@router.get(
+    "/task_status/{task_id}",
+    summary="Verificar status de uma tarefa Celery",
+    response_model=TaskStatusResponse
+)
+def get_task_status(task_id: str) -> TaskStatusResponse:
     """
     Consulta o backend do Celery (Redis) para obter o status e o resultado de uma tarefa.
     """
     task_result_obj: AsyncResult = AsyncResult(task_id, app=celery)
 
-    response = {"task_id": task_id, "status": task_result_obj.status, "result": None}
+    response = TaskStatusResponse(
+        task_id=task_id,
+        status=task_result_obj.status,
+        result=None
+    )
 
     if task_result_obj.ready():
         result = task_result_obj.get()
-        response["result"] = result
+        response.result = result
 
     elif task_result_obj.status == "PENDING":
-        response["result"] = "Tarefa ainda não iniciada."
+        response.result = "Tarefa ainda não iniciada."
     elif task_result_obj.status == "STARTED":
-        response["result"] = "Tarefa em execução."
+        response.result = "Tarefa em execução."
 
-    return JSONResponse(status_code=200, content=response)
+    return response
 
 
 @router.post(
     "/sync",
     dependencies=[Depends(get_api_key)],
     summary="Sincronizar agendamentos do paciente",
+    response_model=TaskQueuedResponse
 )
-def api_sync(payload: SyncPayload):
+def api_sync(payload: SyncPayload) -> TaskQueuedResponse:
     """
     Sincroniza os agendamentos de um paciente do site para o banco de dados.
     """
@@ -137,4 +154,4 @@ def api_sync(payload: SyncPayload):
         ],
     )
 
-    return {"status": "tarefa_enfileirada", "task_id": task.id}
+    return TaskQueuedResponse(task_id=task.id)

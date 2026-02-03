@@ -13,18 +13,15 @@ def main():
     print("========================================================")
 
     # Stage 1: Patients
-    print("\n>>> STAGE 1: Syncing Patients (Excel Extraction + CPF Enrichment)...")
-    try:
-        patient_service = PatientSeedService()
-        p_result = patient_service.seed_patients()
-        print("Patient Sync Completed.")
-        print("Result:", p_result)
-    except Exception as e:
-        print(f"CRITICAL ERROR in Stage 1: {e}")
-        # Decide if we should stop or continue. 
-        # Usually if patients aren't synced, history sync might fail or be incomplete.
-        # But we might want to continue for existing patients.
-        print("Proceeding to Stage 2 with existing patients...")
+    # print("\n>>> STAGE 1: Syncing Patients (Excel Extraction + Phone Enrichment)...")
+    # try:
+    #     patient_service = PatientSeedService()
+    #     p_result = patient_service.seed_patients()
+    #     print("Patient Sync Completed.")
+    #     print("Result:", p_result)
+    # except Exception as e:
+    #     print(f"CRITICAL ERROR in Stage 1: {e}")
+    #     print("Proceeding to Stage 2 with existing patients...")
 
     # Stage 2: History
     print("\n>>> STAGE 2: Syncing Appointment History...")

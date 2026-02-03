@@ -2,7 +2,10 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, time as time_type
 from typing import List, Optional
 from app.core.database import get_session
+from app.models.dados_cliente import DadosCliente
 from app.models.agendamento import Agendamento
+from app.models.enums import SistemaOrigem
+from app.scraper.next_appointments import NextAppointmentsScraper
 from app.scraper.next_appointments import NextAppointmentsScraper
 
 
@@ -55,7 +58,7 @@ class AppointmentSyncService:
         if not appointments:
             return None
 
-        latest = appointments[0].data_consulta
+        latest: date | None = appointments[0].data_consulta
         return latest
 
     def determine_appointment_type(
@@ -110,94 +113,110 @@ class AppointmentSyncService:
 
     def sync_all_appointments(self) -> dict:
         """
-        Syncs all appointments from the website without filtering by patient.
+        Syncs all appointments from the website for all systems.
         This method is designed for cronjob execution every 15 minutes.
         """
-        print("Starting full appointment sync from website")
-
-        website_result = self.scraper.get_next_appointments()
-
-        if website_result.get("status") != "success":
-            print(f"Failed to fetch website data: {website_result}")
-            return {
-                "status": "error",
-                "message": "Failed to fetch website data",
-                "details": website_result,
-            }
-
-        website_appointments = website_result.get("appointments", [])
-        print(f"Found {len(website_appointments)} appointments on website")
-
+        print("Starting full appointment sync from website for all systems")
+        
+        systems = [SistemaOrigem.OURO, SistemaOrigem.OF]
+        all_results = []
+        
+        added_total = 0
+        updated_total = 0
+        
         session = get_session()
         try:
-            added_count = 0
-            updated_count = 0
+            for sistema_enum in systems:
+                print(f"\n--- Syncing system: {sistema_enum.value.upper()} ---")
+                self.scraper.set_sistema(sistema_enum.value)
+                website_result = self.scraper.get_next_appointments()
 
-            for web_app in website_appointments:
-                try:
-                    nome_paciente = web_app.get("nome_paciente", "")
-                    if not nome_paciente:
-                        continue
-
-                    existing_appointment = (
-                        session.query(Agendamento)
-                        .filter(
-                            Agendamento.nome_paciente == nome_paciente,
-                            Agendamento.data_consulta == web_app.get("data_consulta"),
-                            Agendamento.hora_consulta == web_app.get("hora_consulta"),
-                        )
-                        .first()
-                    )
-
-                    if existing_appointment:
-                        existing_appointment.profissional = web_app.get("profissional")
-                        existing_appointment.procedimento = web_app.get("procedimento")
-                        existing_appointment.status = web_app.get("status")
-                        existing_appointment.primeira_consulta = web_app.get(
-                            "primeira_consulta", False
-                        )
-                        updated_count += 1
-                    else:
-                        agendamento = Agendamento(
-                            cpf="11111111111",  # Will be filled later if needed
-                            codigo=web_app.get("codigo", ""),
-                            nome_paciente=nome_paciente,
-                            data_consulta=web_app.get("data_consulta"),
-                            hora_consulta=web_app.get("hora_consulta"),
-                            data_nascimento=web_app.get("data_nascimento") or "1900-01-01",
-                            telefone=web_app.get("telefone") or "45991919191",
-                            profissional=web_app.get("profissional"),
-                            especialidade=web_app.get("especialidade") or "Padrão",
-                            primeira_consulta=web_app.get("primeira_consulta", False),
-                            status=web_app.get("status"),
-                            procedimento=web_app.get("procedimento"),
-                            observacoes=web_app.get("observacoes") or "Sem observações",
-                            canal_agendamento="website_sync",
-                            created_at=datetime.now(),
-                        )
-                        session.add(agendamento)
-                        added_count += 1
-
-                except Exception as e:
-                    print(f"Error processing appointment: {e}")
+                if website_result.get("status") != "success":
+                    print(f"Failed to fetch website data for {sistema_enum}: {website_result}")
                     continue
 
-            session.commit()
+                website_appointments = website_result.get("appointments", [])
+                print(f"Found {len(website_appointments)} appointments on website for {sistema_enum}")
+
+                for web_app in website_appointments:
+                    try:
+                        codigo = web_app.get("codigo")
+                        if not codigo:
+                            continue
+                        
+                        try:
+                            codigo_int = int(codigo)
+                        except ValueError:
+                            continue
+
+                        # Find patient in DB
+                        patient = session.query(DadosCliente).filter_by(
+                            codigo=codigo_int,
+                            sistema_origem=sistema_enum
+                        ).first()
+
+                        if not patient:
+                            print(f"  Warning: Patient {codigo} not found in {sistema_enum.value}. Skipping.")
+                            continue
+
+                        existing_appointment = (
+                            session.query(Agendamento)
+                            .filter(
+                                Agendamento.id_cliente == patient.id,
+                                Agendamento.data_consulta == web_app.get("data_consulta"),
+                                Agendamento.hora_consulta == web_app.get("hora_consulta"),
+                            )
+                            .first()
+                        )
+
+                        if existing_appointment:
+                            existing_appointment.profissional = web_app.get("profissional")
+                            existing_appointment.procedimento = web_app.get("procedimento")
+                            existing_appointment.status = web_app.get("status")
+                            updated_total += 1
+                        else:
+                            agendamento = Agendamento(
+                                id_cliente=patient.id,
+                                sistema_origem=sistema_enum,
+                                cpf=patient.cpf,
+                                codigo=patient.codigo,
+                                nome_paciente=web_app.get("nome_paciente", patient.nomewpp),
+                                data_consulta=web_app.get("data_consulta"),
+                                hora_consulta=web_app.get("hora_consulta"),
+                                data_nascimento=patient.data_nascimento or "1900-01-01",
+                                telefone=web_app.get("telefone") or patient.telefone or patient.cad_telefone,
+                                profissional=web_app.get("profissional"),
+                                especialidade=web_app.get("especialidade") or "Padrão",
+                                status=web_app.get("status"),
+                                procedimento=web_app.get("procedimento"),
+                                observacoes=web_app.get("observacoes") or "Sem observações",
+                                canal_agendamento="website_sync",
+                                created_at=datetime.now(),
+                            )
+                            session.add(agendamento)
+                            added_total += 1
+
+                    except Exception as e:
+                        print(f"  Error processing appointment for code {codigo}: {e}")
+                        continue
+
+                session.commit()
+                print(f"Completed sync for {sistema_enum.value}.")
 
             return {
                 "status": "success",
-                "total_website_appointments": len(website_appointments),
-                "new_appointments_added": added_count,
-                "appointments_updated": updated_count,
+                "new_appointments_added": added_total,
+                "appointments_updated": updated_total,
                 "sync_timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
             session.rollback()
-            print(f"Error during full sync: {e}")
+            print(f"Critical error during full sync: {e}")
             return {"status": "error", "message": str(e)}
         finally:
             session.close()
+            self.scraper.quit()
 
     def compare_and_sync(
         self, cpf: str, nome_paciente: str, medico: str | None = None

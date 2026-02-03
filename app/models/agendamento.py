@@ -23,7 +23,8 @@ class Agendamento(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     created_at = Column(DateTime(timezone=True))
     updated_at = Column(DateTime(timezone=True))
-    id_cliente = Column(BigInteger, nullable=True) # Should be FK
+    paciente_id = Column(BigInteger, nullable=True) # Renamed from id_cliente
+    profissional_id = Column(BigInteger, nullable=True)
     telefone = Column(Text, nullable=True)
     codigo = Column(SmallInteger, nullable=True)
     cpf = Column(Text, nullable=True)

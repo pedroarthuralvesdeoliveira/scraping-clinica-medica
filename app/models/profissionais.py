@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import ENUM
 from app.core.database import Base
@@ -8,8 +8,8 @@ class Profissional(Base):
     __tablename__ = "profissionais"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), onupdate=datetime.now(timezone.utc))
     nome_completo = Column(String, nullable=False)
     nome_exibicao = Column(String, nullable=False)
     especialidade = Column(String, nullable=False)

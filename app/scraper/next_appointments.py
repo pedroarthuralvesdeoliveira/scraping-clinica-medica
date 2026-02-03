@@ -248,10 +248,13 @@ class NextAppointmentsScraper(Browser):
                     hora_str = row["HORA"]
                     hora_obj = None
                     if not pd.isna(hora_str) and isinstance(hora_str, str):
-                        try:
-                            hora_obj = datetime.strptime(hora_str, "%H:%M:%S").time()
-                        except ValueError:
-                            pass
+                        hora_str_clean = hora_str.strip()
+                        for fmt in ["%H:%M:%S", "%H:%M"]:
+                            try:
+                                hora_obj = datetime.strptime(hora_str_clean, fmt).time()
+                                break
+                            except ValueError:
+                                continue
 
                     appointment = {
                         "data_consulta": data_obj,

@@ -23,17 +23,14 @@ class AppointmentHistoryService:
         }
 
         try:
-            # Group by system to minimize system switching overhead (if any) and for logic clarity
             systems = [SistemaOrigem.OURO, SistemaOrigem.OF]
 
             for sistema_enum in systems:
                 sistema_str = sistema_enum.value
                 print(f"\n--- Processing System: {sistema_str.upper()} ---")
 
-                # Set scraper system
                 self.scraper.set_sistema(sistema_str)
 
-                # Fetch patient codes for this system
                 patients = session.query(DadosCliente).filter(
                     DadosCliente.sistema_origem == sistema_enum,
                     DadosCliente.codigo.isnot(None)
@@ -46,7 +43,6 @@ class AppointmentHistoryService:
                         stats["total_patients_processed"] += 1
                         print(f"Scraping history for patient {patient.codigo} (ID: {patient.id})...")
 
-                        # Scrape history using Code
                         result = self.scraper.get_patient_history(str(patient.codigo), search_type="codigo")
                         
                         if result.get("status") != "success":
@@ -68,9 +64,38 @@ class AppointmentHistoryService:
 
                             try:
                                 data_consulta = datetime.strptime(dta_str, "%d/%m/%Y").date()
-                                hora_consulta = datetime.strptime(hora_str, "%H:%M").time()
-                            except ValueError as ve:
-                                print(f"Date/Time parse error: {ve}")
+                                
+                                # Robust Time Parsing
+                                if not hora_str:
+                                    continue
+                                    
+                                hora_str_clean = hora_str.strip()
+                                time_formats = ["%H:%M:%S", "%H:%M"]
+                                hora_consulta = None
+                                
+                                for fmt in time_formats:
+                                    try:
+                                        hora_consulta = datetime.strptime(hora_str_clean, fmt).time()
+                                        break
+                                    except ValueError:
+                                        continue
+                                
+                                if not hora_consulta:
+                                    # Fallback: take the first two parts if there are more than 2
+                                    parts = hora_str_clean.split(':')
+                                    if len(parts) >= 2:
+                                        try:
+                                            fake_hora = f"{parts[0]:0>2}:{parts[1]:0>2}"
+                                            hora_consulta = datetime.strptime(fake_hora, "%H:%M").time()
+                                        except:
+                                            pass
+                                
+                                if not hora_consulta:
+                                    print(f"!!! [DEBUG-FIX] Could not parse time '{hora_str}' for date {dta_str}")
+                                    continue
+                                    
+                            except Exception as e:
+                                print(f"!!! [DEBUG-FIX] Date/Time error for {dta_str} {hora_str}: {e}")
                                 continue
 
                             prof_name = apt_data.get("profissional")
@@ -79,7 +104,7 @@ class AppointmentHistoryService:
 
                             # Check for duplicates based on client, date, time
                             exists = session.query(Agendamento).filter_by(
-                                id_cliente=patient.id,
+                                paciente_id=patient.id,
                                 data_consulta=data_consulta,
                                 hora_consulta=hora_consulta,
                             ).first()
@@ -99,8 +124,8 @@ class AppointmentHistoryService:
 
                             # Create new appointment
                             new_apt = Agendamento(
-                                id_cliente=patient.id,
-                                id_profissional=prof_id,
+                                paciente_id=patient.id,
+                                profissional_id=prof_id,
                                 sistema_origem=sistema_enum,
                                 
                                 # Denormalized fields from Patient
