@@ -25,7 +25,7 @@ class Profissional(Base):
     config_atendimento = Column(JSON)
     rqe = Column(String)
     codigo = Column(String)
-    sistema_origem = Column(ENUM("sistema_origem_enum", name="sistema_origem_enum"))
+    sistema_origem = Column(String)  # Changed from ENUM for compatibility
 
     __table_args__ = (
         Index("idx_profissionais_config_atendimento", "config_atendimento", postgresql_using="gin"),

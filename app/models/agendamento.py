@@ -46,6 +46,6 @@ class Agendamento(Base):
 
     retorno_ate = Column(Date, nullable=True)
     sistema_origem = Column(
-        PG_ENUM(SistemaOrigem, name='sistema_origem_enum', create_type=False),
+        String,  # Use String instead of ENUM for flexibility
         nullable=True
     )

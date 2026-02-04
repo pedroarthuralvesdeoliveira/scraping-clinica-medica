@@ -14,6 +14,17 @@ from app.scraper.base import Browser
 class PatientHistoryScraper(Browser):
     def __init__(self):
         super().__init__()
+        self._logged_in_system = None  # Track which system we're logged into
+        self._on_search_screen = False  # Track if we're on the patient search screen
+
+    def set_sistema(self, sistema: str):
+        """Override to reset session state when switching systems."""
+        new_sistema = sistema.lower()
+        if self.current_system != new_sistema:
+            # System is changing, reset session tracking
+            self._logged_in_system = None
+            self._on_search_screen = False
+        super().set_sistema(sistema)
 
     def go_to_next_page(self):
         try:
@@ -222,29 +233,74 @@ class PatientHistoryScraper(Browser):
             return None
 
 
+    def ensure_logged_in(self):
+        """
+        Ensures we are logged into the correct system.
+        Only performs login if not already logged in or if system changed.
+        """
+        target_system = self.current_system.lower()
+        
+        # Check if we're already logged into the correct system
+        if self._logged_in_system == target_system:
+            # Verify we're still on a valid page (not logged out)
+            current_url = self.driver.current_url or ""
+            if "softclyn.com" in current_url and "login" not in current_url.lower():
+                print(f"Already logged into {target_system.upper()}, reusing session.")
+                return True
+        
+        # Need to login (first time or system changed)
+        print(f"Logging into system: {target_system.upper()}")
+        self._login(medico=None)
+        self._close_modal()
+        self._logged_in_system = target_system
+        self._on_search_screen = False
+        return True
+
+    def ensure_on_patient_search(self):
+        """
+        Ensures we are on the patient search screen.
+        Navigates there if not already present.
+        """
+        if self._on_search_screen:
+            # Verify we're still on the search screen by checking for the search field
+            search_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade", timeout=3)
+            if search_field:
+                print("Already on patient search screen, reusing.")
+                return True
+            else:
+                # We're not on the search screen anymore, need to navigate
+                self._on_search_screen = False
+        
+        # Navigate to patient search screen
+        self._click_on_appointment_menu()
+        
+        pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
+        prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
+        if prontuario_menu:
+            try:
+                prontuario_menu.click()
+            except:
+                self.execute_script("arguments[0].click();", prontuario_menu)
+        
+        time.sleep(1)
+        self._on_search_screen = True
+        return True
+
     def get_patient_history(self, identifier: str, search_type: str = "cpf"):
         """
         Scrapes the patient's appointment history from the website.
         Returns a list of appointment dictionaries.
+        
+        Optimized to reuse existing session - only logs in once per system.
         """
         try:
-            self._login(medico=None)
-
-            self._close_modal()
-
-            self._click_on_appointment_menu()
-
-            print(f"Navigating to patient history search for {search_type.upper()}: {identifier}")
-
-            pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
-            prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
-            if prontuario_menu:
-                try:
-                    prontuario_menu.click()
-                except:
-                    self.execute_script("arguments[0].click();", prontuario_menu)
+            # Ensure we're logged in (will skip if already logged into correct system)
+            self.ensure_logged_in()
             
-            time.sleep(1)
+            # Ensure we're on the patient search screen (will skip if already there)
+            self.ensure_on_patient_search()
+
+            print(f"Searching patient history for {search_type.upper()}: {identifier}")
 
             search_patient = self.wait_for_element(
                 By.ID,
@@ -404,6 +460,8 @@ class PatientHistoryScraper(Browser):
             self.save_screenshot("patient_history_error.png")
             return {"status": "error", "message": str(e)}
         finally:
+            # Reset search screen state - we're now on the history view
+            self._on_search_screen = False
             print("History fetch cycle ended.")
 
 if __name__ == "__main__":

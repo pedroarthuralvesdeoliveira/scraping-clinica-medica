@@ -78,21 +78,22 @@ class NextAppointmentsService:
                         new_apt = Agendamento(
                             paciente_id=patient.id if patient else None,
                             profissional_id=prof_id,
-                            sistema_origem=sistema,
+                            sistema_origem=sistema.value,  # Convert enum to string
                             
-                            # Fields from scraper
+                            # Fields from scraper (with defaults for NOT NULL columns)
                             codigo=int(codigo_str) if codigo_str.isdigit() else None,
-                            nome_paciente=apt_data.get("nome_paciente"),
-                            telefone=apt_data.get("telefone"),
-                            cpf=patient.cpf if patient else None,
+                            nome_paciente=apt_data.get("nome_paciente") or "",  # NOT NULL
+                            telefone=apt_data.get("telefone") or "",  # NOT NULL
+                            cpf=patient.cpf if patient and patient.cpf else "",  # NOT NULL
+                            data_nascimento=patient.data_nascimento if patient and patient.data_nascimento else datetime(1900, 1, 1).date(),  # NOT NULL
                             
-                            data_consulta=apt_data.get("data_consulta"),
-                            hora_consulta=apt_data.get("hora_consulta"),
-                            profissional=prof_name,
+                            data_consulta=apt_data.get("data_consulta"),  # NOT NULL
+                            hora_consulta=apt_data.get("hora_consulta"),  # NOT NULL
+                            profissional=prof_name or "",  # NOT NULL
+                            especialidade=apt_data.get("especialidade") or "",  # NOT NULL
                             procedimento=apt_data.get("procedimento"),
                             status=apt_data.get("status"),
                             primeira_consulta=apt_data.get("primeira_consulta"),
-                            especialidade=apt_data.get("especialidade"),
                             observacoes=apt_data.get("observacoes")
                         )
                         session.add(new_apt)

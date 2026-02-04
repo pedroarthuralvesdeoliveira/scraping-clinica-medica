@@ -126,23 +126,21 @@ class AppointmentHistoryService:
                             new_apt = Agendamento(
                                 paciente_id=patient.id,
                                 profissional_id=prof_id,
-                                sistema_origem=sistema_enum,
+                                sistema_origem=sistema_enum.value,  # Convert enum to string
                                 
-                                # Denormalized fields from Patient
-                                cpf=patient.cpf,
-                                telefone=patient.cad_telefone or patient.telefone,
-                                nome_paciente=patient.nomewpp, # Fallback name
-                                data_nascimento=patient.data_nascimento,
-                                profissional=prof_name,
+                                # Denormalized fields from Patient (with defaults for NOT NULL columns)
+                                cpf=patient.cpf or "",  # NOT NULL
+                                telefone=patient.cad_telefone or patient.telefone or "",  # NOT NULL
+                                nome_paciente=patient.nomewpp or "",  # NOT NULL
+                                data_nascimento=patient.data_nascimento or datetime(1900, 1, 1).date(),  # NOT NULL - sentinel date
+                                profissional=prof_name or "",  # NOT NULL
+                                especialidade="",  # NOT NULL
                                 
                                 # Scraped fields
-                                data_consulta=data_consulta,
-                                hora_consulta=hora_consulta,
+                                data_consulta=data_consulta,  # NOT NULL
+                                hora_consulta=hora_consulta,  # NOT NULL
                                 # profissional=apt_data.get("profissional"),
-                                procedimento=apt_data.get("tipo"), # Mapping 'tipo' to 'procedimento' or 'especialidade'? Schema has both.
-                                # 'tipo' in scraper seems to be like "CONSULTA", "RETORNO", etc.
-                                # 'especialidade' is NOT in scraper data. 
-                                especialidade="", 
+                                procedimento=apt_data.get("tipo"), # Mapping 'tipo' to 'procedimento'
                                 status="Realizado", # Assumption for history items
                                 
                                 observacoes=f"Scraped type: {apt_data.get('tipo')}"

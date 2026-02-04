@@ -24,7 +24,7 @@ def get_or_create_professional(session, nome_medico: str, sistema_origem) -> int
         nome_completo=nome_medico,
         nome_exibicao=nome_medico,
         especialidade="Não Identificada", # O scraper do histórico não traz especialidade
-        sistema_origem=sistema_origem,
+        sistema_origem=sistema_origem.value if hasattr(sistema_origem, 'value') else sistema_origem,  # Convert enum to string
         codigo=None,
         ativo=True
     )
