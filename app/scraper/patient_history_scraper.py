@@ -286,6 +286,29 @@ class PatientHistoryScraper(Browser):
         self._on_search_screen = True
         return True
 
+    def _close_history_modal(self):
+        """
+        Closes the patient history modal to return to the search screen.
+        This allows searching for the next patient without re-navigating.
+        """
+        try:
+            close_button = self.wait_for_element(
+                By.XPATH,
+                "//div[contains(@class,'modal') and contains(@style,'display: block')]//button[@data-dismiss='modal']",
+                timeout=5
+            )
+            if close_button:
+                try:
+                    close_button.click()
+                except:
+                    self.execute_script("arguments[0].click();", close_button)
+                print("History modal closed.")
+                time.sleep(0.5)
+                return True
+        except Exception as e:
+            print(f"Could not close history modal: {e}")
+        return False
+
     def get_patient_history(self, identifier: str, search_type: str = "cpf"):
         """
         Scrapes the patient's appointment history from the website.
@@ -460,8 +483,13 @@ class PatientHistoryScraper(Browser):
             self.save_screenshot("patient_history_error.png")
             return {"status": "error", "message": str(e)}
         finally:
-            # Reset search screen state - we're now on the history view
-            self._on_search_screen = False
+            # Close the history modal to return to search screen
+            if self._close_history_modal():
+                # We're back on search screen, can reuse for next patient
+                self._on_search_screen = True
+            else:
+                # Failed to close modal, will need to re-navigate
+                self._on_search_screen = False
             print("History fetch cycle ended.")
 
 if __name__ == "__main__":

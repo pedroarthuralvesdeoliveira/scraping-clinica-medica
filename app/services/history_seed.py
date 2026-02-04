@@ -11,8 +11,16 @@ class AppointmentHistoryService:
     def __init__(self):
         self.scraper = PatientHistoryScraper()
 
-    def seed_history(self) -> dict:
-        print("Starting appointment history seed process...")
+    def seed_history(self, offset: int = 0, limit: int | None = None, sistema_filter: str | None = None) -> dict:
+        """
+        Seeds appointment history from the scraper.
+        
+        Args:
+            offset: Number of patients to skip (for parallel processing)
+            limit: Maximum number of patients to process (None = all)
+            sistema_filter: Filter by system ('ouro', 'of', or None for both)
+        """
+        print(f"Starting appointment history seed process (offset={offset}, limit={limit}, sistema={sistema_filter or 'all'})...")
         
         session = get_session()
         stats = {
@@ -23,7 +31,17 @@ class AppointmentHistoryService:
         }
 
         try:
-            systems = [SistemaOrigem.OURO, SistemaOrigem.OF]
+            # Filter systems based on parameter
+            if sistema_filter:
+                sistema_filter = sistema_filter.lower()
+                if sistema_filter == 'ouro':
+                    systems = [SistemaOrigem.OURO]
+                elif sistema_filter == 'of':
+                    systems = [SistemaOrigem.OF]
+                else:
+                    systems = [SistemaOrigem.OURO, SistemaOrigem.OF]
+            else:
+                systems = [SistemaOrigem.OURO, SistemaOrigem.OF]
 
             for sistema_enum in systems:
                 sistema_str = sistema_enum.value
@@ -31,12 +49,20 @@ class AppointmentHistoryService:
 
                 self.scraper.set_sistema(sistema_str)
 
-                patients = session.query(DadosCliente).filter(
+                # Build query with offset and limit for parallel processing
+                query = session.query(DadosCliente).filter(
                     DadosCliente.sistema_origem == sistema_enum,
                     DadosCliente.codigo.isnot(None)
-                ).all()
+                ).order_by(DadosCliente.id)  # Consistent ordering for offset
+                
+                if offset > 0:
+                    query = query.offset(offset)
+                if limit is not None:
+                    query = query.limit(limit)
+                
+                patients = query.all()
 
-                print(f"Found {len(patients)} patients in {sistema_str}.")
+                print(f"Found {len(patients)} patients to process in {sistema_str} (offset={offset}, limit={limit}).")
 
                 for patient in patients:
                     try:

@@ -204,9 +204,9 @@ class NextAppointmentsScraper(Browser):
 
     def get_excel_data(self):
         try:
-            folder_path = (
-                "/home/pedro/freelas/visualsoft/scraping-clinica-medica/app/scraper/data"
-            )
+            # Use relative path based on this file's location
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            folder_path = os.path.join(base_dir, "data")
             file_name = "26relatorio.xls"
             full_path = os.path.join(folder_path, file_name)
             df = pd.read_excel(full_path, engine="calamine", skiprows=1)
@@ -304,9 +304,9 @@ class NextAppointmentsScraper(Browser):
 
     def remove_excel_file(self):
         try:
-            folder_path = (
-                "/home/pedro/freelas/visualsoft/scraping-clinica-medica/app/scraper/data"
-            )
+            # Use relative path based on this file's location
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            folder_path = os.path.join(base_dir, "data")
             file_name = "26relatorio.xls"
             full_path = os.path.join(folder_path, file_name)
             if os.path.exists(full_path):

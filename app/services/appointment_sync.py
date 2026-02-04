@@ -6,7 +6,6 @@ from app.models.dados_cliente import DadosCliente
 from app.models.agendamento import Agendamento
 from app.models.enums import SistemaOrigem
 from app.scraper.next_appointments import NextAppointmentsScraper
-from app.scraper.next_appointments import NextAppointmentsScraper
 
 
 class AppointmentSyncService:
@@ -17,6 +16,7 @@ class AppointmentSyncService:
         """
         Retrieves all CPFs from the database.
         """
+        should_close = session is None
         if not session:
             session = get_session()
 
@@ -24,7 +24,7 @@ class AppointmentSyncService:
             cpfs = session.query(Agendamento.cpf).distinct().all()
             return [cpf[0] for cpf in cpfs]
         finally:
-            if not session:
+            if should_close:
                 session.close()
 
     def get_db_appointments(
@@ -33,6 +33,7 @@ class AppointmentSyncService:
         """
         Retrieves all appointments from the database for a given CPF.
         """
+        should_close = session is None
         if not session:
             session = get_session()
 
@@ -45,7 +46,7 @@ class AppointmentSyncService:
             )
             return appointments
         finally:
-            if not session:
+            if should_close:
                 session.close()
 
     def get_latest_db_appointment_date(
@@ -162,7 +163,7 @@ class AppointmentSyncService:
                         existing_appointment = (
                             session.query(Agendamento)
                             .filter(
-                                Agendamento.id_cliente == patient.id,
+                                Agendamento.paciente_id == patient.id,
                                 Agendamento.data_consulta == web_app.get("data_consulta"),
                                 Agendamento.hora_consulta == web_app.get("hora_consulta"),
                             )
@@ -176,7 +177,7 @@ class AppointmentSyncService:
                             updated_total += 1
                         else:
                             agendamento = Agendamento(
-                                id_cliente=patient.id,
+                                paciente_id=patient.id,
                                 sistema_origem=sistema_enum,
                                 cpf=patient.cpf,
                                 codigo=patient.codigo,
