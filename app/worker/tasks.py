@@ -1,3 +1,4 @@
+from app.scraper.patient_history_scraper import PatientHistoryScraper
 from celery import shared_task
 import redis
 from contextlib import contextmanager
@@ -35,7 +36,7 @@ def redis_lock(lock_name, timeout=60, expire=300):
         try:
             if lock.owned():
                 lock.release()
-        except redis.LockError:
+        except Exception:
             pass
 
 
@@ -49,8 +50,8 @@ def schedule_appointment_task(
 ):
     print(f"Worker recebeu tarefa de agendamento para: {paciente_info.get('nome')}")
 
-    # Cria uma chave única baseada nos parâmetros críticos
     cpf = paciente_info.get("cpf", "unknown")
+    nome = paciente_info.get("nome", "unknown")
     horario = horario_desejado if horario_desejado else "any"
     lock_key = f"lock:schedule:{medico}:{data_desejada}:{horario}:{cpf}"
 
@@ -64,6 +65,7 @@ def schedule_appointment_task(
                 medico, data_desejada, paciente_info, horario_desejado, tipo_atendimento
             )
             print(f"Worker finalizou tarefa de agendamento. Resultado: {result}")
+
             return result
     except Exception as e:
         print(f"Erro ao processar tarefa de agendamento (Lock/Outro): {e}")
@@ -74,13 +76,16 @@ def schedule_appointment_task(
 
 
 @shared_task(name="cancel_appointment_task")
-def cancel_appointment_task(medico, data_desejada, horario_desejado, nome_paciente):
+def cancel_appointment_task(
+    medico, data_desejada, horario_desejado, nome_paciente, cpf=None
+):
     print(f"Worker recebeu tarefa de cancelamento para: {nome_paciente}")
     appointmentCanceller = AppointmentCanceller()
     result = appointmentCanceller.cancel_appointment(
         medico, data_desejada, horario_desejado, nome_paciente
     )
     print(f"Worker finalizou tarefa de cancelamento. Resultado: {result}")
+
     return result
 
 

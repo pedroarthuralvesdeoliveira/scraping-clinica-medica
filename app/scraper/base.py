@@ -1,4 +1,5 @@
 import time
+import os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from ..core.dependencies import get_settings
@@ -12,25 +13,52 @@ class Browser:
     def __init__(self, prefs=None):
         options = webdriver.ChromeOptions()
 
-        prefs = {"safebrowsing.enabled": True}
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        DOWNLOAD_DIR = os.path.join(BASE_DIR, "data")
+
+        # Garante que a pasta exista
+        os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+        prefs = {
+            "download.default_directory": DOWNLOAD_DIR,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": True,
+        }
         options.add_experimental_option("prefs", prefs)
         options.add_argument("--headless=new")
-        options.add_argument(
-            "--no-sandbox"
-        )  # Necessário para rodar como root/em containers
-        options.add_argument(
-            "--disable-dev-shm-usage"
-        )  # Necessário para alguns ambientes Linux
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--start-maximized")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-logging")
+        options.add_argument("--remote-debugging-port=0")
+        options.add_argument("--disable-web-security")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-features=IsolateOrigins,site-per-process")
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--disable-ipc-flooding-protection")
+        options.add_argument("--disable-software-rasterizer")
+        options.add_argument("--disable-infobars")
+        options.add_experimental_option("useAutomationExtension", False)
+        options.set_capability("pageLoadStrategy", "normal")
 
         self.driver = webdriver.Chrome(options=options)
+        self.driver.set_page_load_timeout(180)
+        self.driver.implicitly_wait(10)
         self.settings = get_settings()
         self.is_softclyn_of = False
+        self.current_system = "ouro" 
 
-    def get(self, url):
+    def set_sistema(self, sistema: str):
+        """Define qual sistema será acessado no próximo login."""
+        self.current_system = sistema
+
+    def get(self, url, timeout=60):
+        self.driver.set_page_load_timeout(timeout)
         self.driver.get(url)
 
     def find_element(self, by, value):
@@ -64,7 +92,10 @@ class Browser:
         self.driver.refresh()
 
     def save_screenshot(self, filename):
-        self.driver.save_screenshot(filename)
+        try:
+            self.driver.save_screenshot(filename)
+        except Exception as e:
+            print(f"Could not save screenshot (driver may be disconnected): {e}")
 
     def quit(self):
         if self.driver:
@@ -72,18 +103,20 @@ class Browser:
 
     def _click_on_appointment_menu(self):
         menu = self.wait_for_element(By.ID, "menuAtendimentoLi")
-        try:
-            menu.click()
-        except:
-            self.execute_script("arguments[0].click();", menu)
+        if menu:
+            try:
+                menu.click()
+            except:
+                self.execute_script("arguments[0].click();", menu)
 
         print("Clicando em 'Agendamento' no menu...")
 
         agendamento = self.wait_for_element(By.ID, "M1")
-        try:
-            agendamento.click()
-        except:
-            self.execute_script("arguments[0].click();", agendamento)
+        if agendamento:
+            try:
+                agendamento.click()
+            except:
+                self.execute_script("arguments[0].click();", agendamento)
 
         print("Entrou na tela de agendamento.")
 
@@ -139,7 +172,10 @@ class Browser:
             print(f"Ocorreu outro erro: {e}")
             raise
 
-    def _login(self, medico: str):
+    def _login(
+        self, 
+        medico: str | None = None, 
+    ):
         """
         Realiza o login no sistema Softclyn.
         """
@@ -147,35 +183,75 @@ class Browser:
             URL = self.settings.softclyn_url
             LOGIN = self.settings.softclyn_login_page
 
-            medicos_softclyn_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+            sistema_sufixo = f"_{self.current_system.lower()}"
 
-            URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
+            # URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_ouro/{LOGIN}"
 
-            medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
+            if medico:
+                medicos_softclyn_of = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+                medico_limpo = medico.replace("Dr.", "").replace("Dra.", "").strip()
 
-            for dr in medicos_softclyn_of:
-                if medico_limpo.upper() in dr.upper():
-                    URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
-                    self.is_softclyn_of = True
-                    break
+                sistema_sufixo = f"{self.settings.softclyn_empresa}_{self.current_system.lower()}"
 
-            self.get(URL_BASE)
+                for dr in medicos_softclyn_of:
+                    if medico_limpo.upper() in dr.upper():
+                       #  URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+                        sistema_sufixo = "_of"
+                        self.is_softclyn_of = True
+                        break
 
+                if "_of" in sistema_sufixo:
+                     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+                else:
+                     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_{self.current_system.lower()}/{LOGIN}"
+            else: 
+                URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_{self.current_system.lower()}/{LOGIN}"
+            # if is_softclyn_of:
+            #     URL_BASE = f"{URL}/{self.settings.softclyn_empresa}_of/{LOGIN}"
+            #     self.is_softclyn_of = True
+
+            print(f"Navigating to: {URL_BASE}")
+            self.get(URL_BASE, timeout=self.settings.page_load_timeout)
+
+            time.sleep(3)
+
+            print("Waiting for login form...")
             self.wait_for_element(By.TAG_NAME, "body")
 
-            user = self.find_element(By.ID, "usuario")
-            user.send_keys(self.settings.softclyn_user)
-            password = self.find_element(By.ID, "senha")
-            password.send_keys(self.settings.softclyn_pass)
-
-            self.wait_for_element(By.ID, "btLogin")
-
+            user = self.wait_for_element(By.ID, "usuario", timeout=10)
+            if not user:
+                raise Exception("User field not found")
+            print("User field found")
+            user.clear()
             self.execute_script(
-                "arguments[0].click();", self.find_element(By.ID, "btLogin")
+                "arguments[0].value = arguments[1];", user, self.settings.softclyn_user
             )
+            time.sleep(1)
+
+            password = self.wait_for_element(By.ID, "senha", timeout=10)
+            if not password:
+                raise Exception("Password field not found")
+            print("Password field found")
+            password.clear()
+            self.execute_script(
+                "arguments[0].value = arguments[1];",
+                password,
+                self.settings.softclyn_pass,
+            )
+            time.sleep(1)
+
+            login_button = self.wait_for_element(By.ID, "btLogin", timeout=10)
+            if not login_button:
+                raise Exception("Login button not found")
+            print("Login button found, clicking...")
+            self.execute_script("arguments[0].click();", login_button)
+            time.sleep(2)
+
+            print("Login completed successfully")
+
         except Exception as e:
             print(f"Erro ao realizar login: {e}")
-            self.quit()
+            self.save_screenshot("login_error.png")
             raise
 
     def _close_modal(self):

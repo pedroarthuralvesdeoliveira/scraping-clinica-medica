@@ -1,0 +1,50 @@
+name: scraping-clinica-medica
+prefect-version: 2.18.0
+
+# Build configuration
+build:
+  - prefect.deployments.steps.run_shell_script:
+      script: echo "No build step required"
+
+# Push configuration
+push:
+  - prefect.deployments.steps.run_shell_script:
+      script: echo "No push step required"
+
+# Pull configuration  
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /home/pedro/freelas/visualsoft/scraping-clinica-medica
+
+# Deployments
+deployments:
+  - name: history-sync-15min
+    entrypoint: app/flows/history_flow.py:history_sync_flow
+    description: "Sincroniza histórico de agendamentos a cada 15 minutos (upsert: mantém existentes, adiciona novos)"
+    schedule:
+      cron: "*/15 * * * *"
+      timezone: America/Sao_Paulo
+    work_pool:
+      name: default-agent-pool
+    # Skip desabilitado por padrão - todos os pacientes são processados
+    # parameters:
+    #   skip_if_has_recent_history: false  # Opcional: true para otimizar
+    #   days_threshold: 7
+
+  - name: next-appointments-hourly
+    entrypoint: app/flows/next_appointments_flow.py:next_appointments_sync_flow
+    description: "Sincroniza próximos agendamentos a cada hora"
+    schedule:
+      cron: "0 * * * *"
+      timezone: America/Sao_Paulo
+    work_pool:
+      name: default-agent-pool
+
+  - name: patient-sync-daily
+    entrypoint: app/flows/patient_flow.py:patient_sync_flow
+    description: "Sincroniza dados de pacientes diariamente às 8h"
+    schedule:
+      cron: "0 8 * * *"
+      timezone: America/Sao_Paulo
+    work_pool:
+      name: default-agent-pool
