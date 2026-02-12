@@ -14,7 +14,7 @@ push:
 # Pull configuration  
 pull:
   - prefect.deployments.steps.set_working_directory:
-      directory: /home/pedro/freelas/visualsoft/scraping-clinica-medica
+      directory: /code
 
 # Deployments
 deployments:
@@ -25,7 +25,7 @@ deployments:
       cron: "*/15 * * * *"
       timezone: America/Sao_Paulo
     work_pool:
-      name: default-agent-pool
+      name: default
     # Skip desabilitado por padrão - todos os pacientes são processados
     # parameters:
     #   skip_if_has_recent_history: false  # Opcional: true para otimizar
@@ -38,7 +38,7 @@ deployments:
       cron: "0 * * * *"
       timezone: America/Sao_Paulo
     work_pool:
-      name: default-agent-pool
+      name: default
 
   - name: patient-sync-daily
     entrypoint: app/flows/patient_flow.py:patient_sync_flow
@@ -47,4 +47,4 @@ deployments:
       cron: "0 8 * * *"
       timezone: America/Sao_Paulo
     work_pool:
-      name: default-agent-pool
+      name: default
