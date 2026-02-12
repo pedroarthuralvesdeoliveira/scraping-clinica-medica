@@ -1,4 +1,6 @@
 from app.scraper.patient_history_scraper import PatientHistoryScraper
+from app.scraper.next_appointments import NextAppointmentsScraper
+from app.scraper.get_active_patients import GetActivePatients
 from celery import shared_task
 import redis
 from contextlib import contextmanager
@@ -104,3 +106,68 @@ def verify_doctors_calendar_task(
     )
     print(f"Worker finalizou tarefa de verificação. Resultado: {result}")
     return result
+
+
+@shared_task(name="get_patient_history_task")
+def get_patient_history_task(patient_code: str, search_type: str = "codigo"):
+    """
+    Scrapes patient appointment history from the website.
+    Returns the scraped data directly without persisting to DB.
+    """
+    print(f"Worker recebeu tarefa de histórico para código: {patient_code}")
+    scraper = PatientHistoryScraper()
+    try:
+        result = scraper.get_patient_history(patient_code, search_type=search_type)
+        print(f"Worker finalizou busca de histórico. Status: {result.get('status')}")
+        return result
+    except Exception as e:
+        print(f"Erro ao buscar histórico: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        scraper.close()
+
+
+@shared_task(name="get_next_appointments_task")
+def get_next_appointments_task(sistema: str = "OF"):
+    """
+    Scrapes upcoming appointments from the website via Excel export.
+    Returns the scraped data directly without persisting to DB.
+    """
+    print(f"Worker recebeu tarefa de próximos agendamentos ({sistema})")
+    scraper = NextAppointmentsScraper()
+    try:
+        scraper.set_sistema(sistema)
+        result = scraper.get_next_appointments()
+        
+        appointments = result.get("appointments", [])
+        if not appointments and sistema != "OURO":
+            print(f"Nenhum agendamento encontrado no sistema {sistema}. Tentando sistema OURO...")
+            scraper.set_sistema("OURO")
+            result = scraper.get_next_appointments()
+            
+        print(f"Worker finalizou busca de próximos agendamentos. Status: {result.get('status')}")
+        return result
+    except Exception as e:
+        print(f"Erro ao buscar próximos agendamentos: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        scraper.close()
+
+
+@shared_task(name="get_active_patients_task")
+def get_active_patients_task():
+    """
+    Scrapes all active patients from the website.
+    Returns the scraped data directly without persisting to DB.
+    """
+    print("Worker recebeu tarefa de pacientes ativos")
+    scraper = GetActivePatients()
+    try:
+        result = scraper.get_all_active_patients()
+        print(f"Worker finalizou busca de pacientes ativos. Status: {result.get('status')}")
+        return result
+    except Exception as e:
+        print(f"Erro ao buscar pacientes ativos: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        scraper.close()
