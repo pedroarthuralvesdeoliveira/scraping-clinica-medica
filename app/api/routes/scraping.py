@@ -7,24 +7,23 @@ router = APIRouter(prefix="/scraping", tags=["Scraping"])
 
 
 @router.get(
-    "/patient-history/{patient_code}",
+    "/patient-history/{telefone}",
     dependencies=[Depends(get_api_key)],
-    summary="Buscar histórico de agendamentos de um paciente via scraping",
+    summary="Buscar histórico de agendamentos de um paciente por telefone via scraping",
     response_model=TaskQueuedResponse
 )
 def api_get_patient_history(
-    patient_code: str,
-    search_type: str = Query("codigo", description="Tipo de busca: 'codigo' ou 'cpf'")
+    telefone: str,
 ) -> TaskQueuedResponse:
     """
-    Dispara scraping do histórico de agendamentos de um paciente.
+    Dispara scraping do histórico de agendamentos de um paciente pelo telefone.
     Retorna task_id para consultar o resultado via /task_status/{task_id}.
     """
-    print(f"API recebeu busca de histórico para: {patient_code} (tipo: {search_type}). Enfileirando...")
+    print(f"API recebeu busca de histórico para telefone: {telefone}. Enfileirando...")
 
     task = celery.send_task(
         "get_patient_history_task",
-        args=[patient_code, search_type],
+        args=[telefone],
     )
 
     return TaskQueuedResponse(task_id=task.id)

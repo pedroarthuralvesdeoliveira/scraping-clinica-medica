@@ -109,15 +109,37 @@ def verify_doctors_calendar_task(
 
 
 @shared_task(name="get_patient_history_task")
-def get_patient_history_task(patient_code: str, search_type: str = "codigo"):
+def get_patient_history_task(telefone: str):
     """
-    Scrapes patient appointment history from the website.
+    Scrapes patient appointment history by phone number.
+    Looks up the patient code from DB, then scrapes history from the website.
     Returns the scraped data directly without persisting to DB.
     """
-    print(f"Worker recebeu tarefa de histórico para código: {patient_code}")
+    from app.core.database import get_session
+    from app.models.dados_cliente import DadosCliente
+
+    print(f"Worker recebeu tarefa de histórico para telefone: {telefone}")
+    
+    session = get_session()
+    try:
+        patient = session.query(DadosCliente).filter(
+            DadosCliente.telefone == telefone
+        ).first()
+        
+        if not patient or not patient.codigo:
+            return {
+                "status": "error",
+                "message": f"Paciente não encontrado para telefone: {telefone}"
+            }
+        
+        patient_code = str(patient.codigo)
+        print(f"Código encontrado: {patient_code} para telefone: {telefone}")
+    finally:
+        session.close()
+    
     scraper = PatientHistoryScraper()
     try:
-        result = scraper.get_patient_history(patient_code, search_type=search_type)
+        result = scraper.get_patient_history(patient_code, search_type="codigo")
         print(f"Worker finalizou busca de histórico. Status: {result.get('status')}")
         return result
     except Exception as e:

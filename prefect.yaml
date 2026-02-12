@@ -13,8 +13,9 @@ push:
 
 # Pull configuration  
 pull:
-  - prefect.deployments.steps.set_working_directory:
-      directory: /code
+  - prefect.deployments.steps.git_clone:
+      repository: https://github.com/pedroarthuralvesdeoliveira/scraping-clinica-medica.git
+      branch: main
 
 # Deployments
 deployments:
