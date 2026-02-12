@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from ...core.dependencies import get_api_key
 from ..schemas.responses import TaskQueuedResponse
+from ..schemas.common import PatientHistorySearchPayload
 from ...worker.celery_app import celery
 
 router = APIRouter(prefix="/scraping", tags=["Scraping"])
@@ -69,6 +70,33 @@ def api_get_active_patients() -> TaskQueuedResponse:
     task = celery.send_task(
         "get_active_patients_task",
         args=[],
+    )
+
+    return TaskQueuedResponse(task_id=task.id)
+
+
+@router.post(
+    "/search-patient-history",
+    dependencies=[Depends(get_api_key)],
+    summary="Buscar histórico de agendamentos por Nome, CPF, Telefone ou Data de Nascimento",
+    response_model=TaskQueuedResponse
+)
+def api_search_patient_history(
+    payload: PatientHistorySearchPayload,
+) -> TaskQueuedResponse:
+    """
+    Busca paciente no banco de dados e, se não encontrado, busca no sistema
+    endoclin via scraping. Retorna agendamentos futuros dos sistemas OF e OURO.
+    Retorna task_id para consultar o resultado via /task_status/{task_id}.
+    """
+    print(
+        f"API recebeu busca de histórico: tipo={payload.search_type.value}, "
+        f"valor={payload.search_value}. Enfileirando..."
+    )
+
+    task = celery.send_task(
+        "search_patient_history_task",
+        args=[payload.search_type.value, payload.search_value],
     )
 
     return TaskQueuedResponse(task_id=task.id)

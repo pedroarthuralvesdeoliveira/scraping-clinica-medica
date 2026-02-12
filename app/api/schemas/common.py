@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from enum import Enum
 
 
 # ============================================================================
@@ -43,3 +44,24 @@ class VerifyPayload(BaseModel):
     horario_inicial: Optional[str] = Field(None, description="Horário inicial no formato HH:MM")
     horario_final: Optional[str] = Field(None, description="Horário final no formato HH:MM")
     medico: str
+
+
+class SearchTypeEnum(str, Enum):
+    """Tipos de busca de paciente"""
+    NOME = "nome"
+    CPF = "cpf"
+    TELEFONE = "telefone"
+    DATA_NASCIMENTO = "data_nascimento"
+
+
+class PatientHistorySearchPayload(BaseModel):
+    """Payload para busca de histórico de agendamentos por diferentes critérios"""
+    search_type: SearchTypeEnum = Field(
+        ...,
+        description="Tipo de busca: 'nome', 'cpf', 'telefone', ou 'data_nascimento'"
+    )
+    search_value: str = Field(
+        ...,
+        min_length=1,
+        description="Valor da busca (nome do paciente, CPF, telefone ou data de nascimento no formato DD/MM/YYYY)"
+    )

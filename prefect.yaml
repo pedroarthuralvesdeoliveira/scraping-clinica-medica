@@ -1,5 +1,5 @@
 name: scraping-clinica-medica
-prefect-version: 2.18.0
+prefect-version: 3.6.15
 
 # Build configuration
 build:

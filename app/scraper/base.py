@@ -101,6 +101,9 @@ class Browser:
         if self.driver:
             self.driver.quit()
 
+    def close(self):
+        self.quit()
+
     def _click_on_appointment_menu(self):
         menu = self.wait_for_element(By.ID, "menuAtendimentoLi")
         if menu:

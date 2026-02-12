@@ -151,16 +151,28 @@ class PatientHistoryScraper(Browser):
 
             if search_patient_elem:
                 select = Select(search_patient_elem)
-                # Normalize type (e.g., "cpf" -> "Cpf", "nome" -> "Nome")
-                type_normalized = patient_type.capitalize() if patient_type.lower() in ["cpf", "nome"] else patient_type
-                
+                type_text_map = {
+                    "cpf": "Cpf",
+                    "nome": "Nome",
+                    "codigo": "Código",
+                    "telefone": "Telefone",
+                    "datanascimento": "Data Nascimento",
+                    "data_nascimento": "Data Nascimento",
+                }
+                type_value_map = {
+                    "data_nascimento": "dataNascimento",
+                    "datanascimento": "dataNascimento",
+                }
+                visible_text = type_text_map.get(patient_type.lower(), patient_type.capitalize())
+
                 try:
-                    select.select_by_visible_text(type_normalized)
+                    select.select_by_visible_text(visible_text)
                 except:
-                    select.select_by_value(patient_type.lower())
-                
+                    option_value = type_value_map.get(patient_type.lower(), patient_type.lower())
+                    select.select_by_value(option_value)
+
                 time.sleep(1)
-                print(f"Patient search screen ready (type: {type_normalized}).")
+                print(f"Patient search screen ready (type: {visible_text}).")
                 return True
             
             print("Failed to find patient search field 'tipoPesquisaPacienteGrade'.")
@@ -338,15 +350,22 @@ class PatientHistoryScraper(Browser):
                     "cpf": "Cpf",
                     "nome": "Nome",
                     "codigo": "Código",
-                    "prontuario": "Prontuário"
+                    "prontuario": "Prontuário",
+                    "telefone": "Telefone",
+                    "datanascimento": "Data Nascimento",
+                    "data_nascimento": "Data Nascimento",
+                }
+                value_map = {
+                    "data_nascimento": "dataNascimento",
+                    "datanascimento": "dataNascimento",
                 }
                 visible_text = type_map.get(search_type.lower(), search_type.capitalize())
-                
+
                 try:
                     select.select_by_visible_text(visible_text)
                 except:
-                    # Fallback to value if text fails (values are usually lowercase)
-                    select.select_by_value(search_type.lower())
+                    option_value = value_map.get(search_type.lower(), search_type.lower())
+                    select.select_by_value(option_value)
                 time.sleep(2)
 
             print("Entered patient history screen.")
@@ -494,5 +513,5 @@ class PatientHistoryScraper(Browser):
 
 if __name__ == "__main__":
     scraper = PatientHistoryScraper()
-    codigo = scraper.get_patient_by_type("nome", "Pedro Oliveira")
+    codigo = scraper.get_patient_history("761", "codigo")
     print(codigo)

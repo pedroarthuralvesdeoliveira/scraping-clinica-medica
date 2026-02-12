@@ -119,6 +119,10 @@ def get_patient_history_task(telefone: str):
     from app.models.dados_cliente import DadosCliente
 
     print(f"Worker recebeu tarefa de histórico para telefone: {telefone}")
+
+    # TODO: puxa do scraping, não do banco
+
+    ## Primeiro buscamos o código do paciente no banco usando o telefone
     
     session = get_session()
     try:
@@ -193,3 +197,210 @@ def get_active_patients_task():
         return {"status": "error", "message": str(e)}
     finally:
         scraper.close()
+
+
+@shared_task(name="search_patient_history_task")
+def search_patient_history_task(search_type: str, search_value: str):
+    """
+    Searches for a patient by name, CPF, phone, or date of birth.
+    Looks up in the database first, then scrapes from endoclin if not found.
+    Searches both OF and OURO systems. Returns only future appointments.
+    """
+    from app.core.database import get_session
+    from app.models.dados_cliente import DadosCliente
+    from app.models.telefones_paciente import TelefonesPaciente
+    from app.models.enums import SistemaOrigem
+    from datetime import datetime, date
+    from sqlalchemy import or_
+    import re
+
+    print(f"Worker recebeu busca de histórico: tipo={search_type}, valor={search_value}")
+
+    scraper_type_map = {
+        "nome": "nome",
+        "cpf": "cpf",
+        "telefone": "telefone",
+        "data_nascimento": "dataNascimento",
+    }
+    scraper_search_type = scraper_type_map.get(search_type, search_type)
+
+    session = get_session()
+    scraper = PatientHistoryScraper()
+    all_appointments = []
+    patients_found = []
+    today = date.today()
+
+    try:
+        for sistema_str in ["OF", "OURO"]:
+            sistema_enum = SistemaOrigem(sistema_str)
+            print(f"\n--- Processando sistema: {sistema_str} ---")
+
+            scraper.set_sistema(sistema_str)
+
+            # Step 1: Try to find patient in database
+            patient = _find_patient_in_db(
+                session, search_type, search_value, sistema_enum
+            )
+
+            if patient and patient.codigo:
+                identifier = str(patient.codigo)
+                effective_search_type = "codigo"
+                patients_found.append({
+                    "id": patient.id,
+                    "nome": patient.nomewpp,
+                    "codigo": patient.codigo,
+                    "sistema": sistema_str,
+                    "source": "database",
+                })
+                print(
+                    f"Paciente encontrado no banco: codigo={patient.codigo}, "
+                    f"nome={patient.nomewpp}, sistema={sistema_str}"
+                )
+            elif patient and not patient.codigo:
+                identifier = search_value
+                effective_search_type = scraper_search_type
+                patients_found.append({
+                    "id": patient.id,
+                    "nome": patient.nomewpp,
+                    "codigo": None,
+                    "sistema": sistema_str,
+                    "source": "database_sem_codigo",
+                })
+                print(
+                    f"Paciente no banco sem codigo: nome={patient.nomewpp}, "
+                    f"sistema={sistema_str}. Buscando na endoclin por {search_type}."
+                )
+            else:
+                identifier = search_value
+                effective_search_type = scraper_search_type
+                print(
+                    f"Paciente não encontrado no banco para {sistema_str}. "
+                    f"Buscando na endoclin por {search_type}."
+                )
+
+            # Step 2: Scrape appointment history
+            try:
+                result = scraper.get_patient_history(
+                    identifier, search_type=effective_search_type
+                )
+
+                if result.get("status") == "success":
+                    appointments = result.get("appointments", [])
+
+                    # Filter future appointments only
+                    future_appointments = []
+                    for apt in appointments:
+                        try:
+                            apt_date = datetime.strptime(
+                                apt["data_atendimento"], "%d/%m/%Y"
+                            ).date()
+                            if apt_date >= today:
+                                apt["sistema"] = sistema_str
+                                future_appointments.append(apt)
+                        except (ValueError, KeyError):
+                            continue
+
+                    all_appointments.extend(future_appointments)
+                    print(
+                        f"Encontrados {len(appointments)} total, "
+                        f"{len(future_appointments)} futuros em {sistema_str}."
+                    )
+                else:
+                    print(
+                        f"Scraper retornou erro para {sistema_str}: "
+                        f"{result.get('message')}"
+                    )
+            except Exception as e:
+                print(f"Erro no scraping de {sistema_str}: {e}")
+                continue
+
+        # Sort by date ascending
+        all_appointments.sort(
+            key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y")
+        )
+
+        return {
+            "status": "success",
+            "search_type": search_type,
+            "search_value": search_value,
+            "patients_found": patients_found,
+            "appointments": all_appointments,
+            "total_count": len(all_appointments),
+        }
+
+    except Exception as e:
+        print(f"Erro em search_patient_history_task: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        session.close()
+        scraper.quit()
+
+
+def _find_patient_in_db(session, search_type, search_value, sistema_enum):
+    """
+    Searches for a patient in dados_cliente by the given criteria.
+    Returns the first matching DadosCliente or None.
+    """
+    from app.models.dados_cliente import DadosCliente
+    from app.models.telefones_paciente import TelefonesPaciente
+    from datetime import datetime
+    from sqlalchemy import or_
+    import re
+
+    base_query = session.query(DadosCliente).filter(
+        DadosCliente.sistema_origem == sistema_enum
+    )
+
+    if search_type == "nome":
+        return base_query.filter(
+            DadosCliente.nomewpp.ilike(f"%{search_value}%")
+        ).first()
+
+    elif search_type == "cpf":
+        cpf_digits = re.sub(r"\D", "", search_value)
+        return base_query.filter(
+            DadosCliente.cpf == cpf_digits
+        ).first()
+
+    elif search_type == "telefone":
+        phone_digits = re.sub(r"\D", "", search_value)
+        if not phone_digits:
+            return None
+
+        # Check dados_cliente.telefone and cad_telefone
+        patient = base_query.filter(
+            or_(
+                DadosCliente.telefone.like(f"%{phone_digits}%"),
+                DadosCliente.cad_telefone.like(f"%{phone_digits}%"),
+            )
+        ).first()
+
+        if patient:
+            return patient
+
+        # Check telefones_paciente table
+        tel_record = session.query(TelefonesPaciente).join(
+            DadosCliente,
+            TelefonesPaciente.cliente_codigo == DadosCliente.id
+        ).filter(
+            DadosCliente.sistema_origem == sistema_enum,
+            TelefonesPaciente.numero.like(f"%{phone_digits}%"),
+        ).first()
+
+        if tel_record:
+            return session.query(DadosCliente).get(tel_record.cliente_codigo)
+
+        return None
+
+    elif search_type == "data_nascimento":
+        try:
+            dob = datetime.strptime(search_value, "%d/%m/%Y").date()
+        except ValueError:
+            print(f"Formato de data inválido: {search_value}. Esperado DD/MM/YYYY.")
+            return None
+
+        return base_query.filter(
+            DadosCliente.data_nascimento == dob
+        ).first()
+
+    return None
