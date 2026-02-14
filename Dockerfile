@@ -72,14 +72,8 @@ COPY . .
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD celery -A app.worker.celery_app:celery inspect ping || exit 1
-
 CMD ["uv", "run", "celery", "-A", "app.worker.celery_app:celery", "worker", "--loglevel=info", "-c", "1", "--max-tasks-per-child=10"]
 
 
-FROM base AS orchestrator
-COPY --from=python_deps /opt/venv /opt/venv
-COPY . .
-ENV PATH="/opt/venv/bin:$PATH"
+FROM worker AS orchestrator
 CMD ["uv", "run", "python", "-m", "app.orchestrator"]

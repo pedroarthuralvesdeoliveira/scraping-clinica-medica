@@ -11,11 +11,14 @@ push:
   - prefect.deployments.steps.run_shell_script:
       script: echo "No push step required"
 
-# Pull configuration  
+# Pull configuration
 pull:
   - prefect.deployments.steps.git_clone:
       repository: https://github.com/pedroarthuralvesdeoliveira/scraping-clinica-medica.git
       branch: main
+  - prefect.deployments.steps.run_shell_script:
+      script: pip install -e .
+      directory: "{{ git_clone.directory }}"
 
 # Deployments
 deployments:
