@@ -149,6 +149,9 @@ class Browser:
             print(f"Nome '{medico_limpo}' digitado no campo de busca.")
 
             try:
+                search_field = self.wait_for_element(
+                    By.XPATH, "//input[@class='select2-search__field']"
+                )
                 if search_field:
                     search_field.send_keys(Keys.ENTER)
                 print("Enviado ENTER para selecionar.")
