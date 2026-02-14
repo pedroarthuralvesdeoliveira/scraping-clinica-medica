@@ -64,7 +64,8 @@ class AvailabilityChecker(Browser):
                 return {"status": "unavailable", "message": f"Horário {horario_desejado} não existe na grade para {data_desejada}."}
 
             elementos_filhos_xpath = f"//tr[@id='{horario_id}']/td[2]/*"
-            elementos_filhos = self.wait_for_element(By.XPATH, elementos_filhos_xpath)
+            self.wait_for_element(By.XPATH, f"//tr[@id='{horario_id}']")
+            elementos_filhos = self.find_elements(By.XPATH, elementos_filhos_xpath)
 
             if elementos_filhos and len(elementos_filhos) > 0:
                 print(f"O horário {horario_desejado}, formatado como {horario_id}, do dia {data_desejada} está OCUPADO.")
@@ -115,7 +116,8 @@ class AvailabilityChecker(Browser):
             horario_final_id = int((horario_final or "19:30").replace(":", "") + "00")
 
             elementos_filhos_xpath = "//tr[@class='ui-droppable' and normalize-space(td[2]) = '' and not(td[2]/*)]"
-            elementos_filhos = self.wait_for_element(By.XPATH, elementos_filhos_xpath)
+            self.wait_for_element(By.XPATH, "//tr[@class='ui-droppable']")
+            elementos_filhos = self.find_elements(By.XPATH, elementos_filhos_xpath)
 
             available_times = []
 
@@ -124,7 +126,8 @@ class AvailabilityChecker(Browser):
                     slot_id = slot_tr.get_attribute("id")
                     print(f"Id do slot: {slot_id}, inicial: {horario_inicial_id}, final: {horario_final_id}")
                     if slot_id and (int(slot_id) >= horario_inicial_id) and (int(slot_id) <= horario_final_id):
-                        available_times.append(slot_tr.wait_for_element(By.TAG_NAME, "a").text)
+                        link = slot_tr.find_element(By.TAG_NAME, "a")
+                        available_times.append(link.text)
 
             return {"status": "success", "date": data_desejada, "slots": available_times}
         else:
@@ -174,7 +177,8 @@ class AvailabilityChecker(Browser):
                     try:
                         available_slot_xpath = "//a[starts-with(@href, 'javascript:marcaHorarioAgenda')]"
 
-                        available_slots = self.wait_for_element(By.XPATH, available_slot_xpath)
+                        self.wait_for_element(By.XPATH, available_slot_xpath, timeout=3)
+                        available_slots = self.find_elements(By.XPATH, available_slot_xpath)
 
                         if available_slots:
                             next_time = available_slots[0].text

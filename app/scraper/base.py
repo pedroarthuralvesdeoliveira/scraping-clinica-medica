@@ -53,6 +53,12 @@ class Browser:
         self.is_softclyn_of = False
         self.current_system = "ouro" 
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.quit()
+
     def set_sistema(self, sistema: str):
         """Define qual sistema será acessado no próximo login."""
         self.current_system = sistema
@@ -109,7 +115,7 @@ class Browser:
         if menu:
             try:
                 menu.click()
-            except:
+            except Exception:
                 self.execute_script("arguments[0].click();", menu)
 
         print("Clicando em 'Agendamento' no menu...")
@@ -118,7 +124,7 @@ class Browser:
         if agendamento:
             try:
                 agendamento.click()
-            except:
+            except Exception:
                 self.execute_script("arguments[0].click();", agendamento)
 
         print("Entrou na tela de agendamento.")
@@ -168,9 +174,10 @@ class Browser:
             except TimeoutException:
                 print("Opção não encontrada ou já selecionada pelo ENTER.")
             except StaleElementReferenceException:
-                medico_option_xpath = f"//li[contains(@class, 'select2-results__option') and contains(text(), '{medico_limpo}')]"
-                medico_option = self.find_element(By.XPATH, medico_option_xpath)
-                medico_option.click()
+                time.sleep(1)
+                medico_option = self.wait_for_element(By.XPATH, medico_option_xpath)
+                if medico_option:
+                    medico_option.click()
 
         except TimeoutException:
             print("ERRO: O medico não foi encontrado a tempo.")

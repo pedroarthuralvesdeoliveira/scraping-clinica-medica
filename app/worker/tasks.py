@@ -59,6 +59,7 @@ def schedule_appointment_task(
 
     print(f"Tentando adquirir lock: {lock_key}")
 
+    appointmentScheduler = None
     try:
         with redis_lock(lock_key, timeout=30, expire=300):
             print(f"Lock adquirido: {lock_key}. Iniciando agendamento...")
@@ -75,6 +76,9 @@ def schedule_appointment_task(
             "status": "error",
             "message": f"Falha na execução ou lock timeout: {str(e)}",
         }
+    finally:
+        if appointmentScheduler:
+            appointmentScheduler.quit()
 
 
 @shared_task(name="cancel_appointment_task")
@@ -83,12 +87,17 @@ def cancel_appointment_task(
 ):
     print(f"Worker recebeu tarefa de cancelamento para: {nome_paciente}")
     appointmentCanceller = AppointmentCanceller()
-    result = appointmentCanceller.cancel_appointment(
-        medico, data_desejada, horario_desejado, nome_paciente
-    )
-    print(f"Worker finalizou tarefa de cancelamento. Resultado: {result}")
-
-    return result
+    try:
+        result = appointmentCanceller.cancel_appointment(
+            medico, data_desejada, horario_desejado, nome_paciente
+        )
+        print(f"Worker finalizou tarefa de cancelamento. Resultado: {result}")
+        return result
+    except Exception as e:
+        print(f"Erro ao processar tarefa de cancelamento: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        appointmentCanceller.quit()
 
 
 @shared_task(name="verify_doctors_calendar_task")
@@ -101,11 +110,17 @@ def verify_doctors_calendar_task(
 ):
     print(f"Worker recebeu tarefa de verificação para: {medico}")
     availabilityChecker = AvailabilityChecker()
-    result = availabilityChecker.verify_doctors_calendar(
-        medico, data_desejada, horario_desejado, horario_inicial, horario_final
-    )
-    print(f"Worker finalizou tarefa de verificação. Resultado: {result}")
-    return result
+    try:
+        result = availabilityChecker.verify_doctors_calendar(
+            medico, data_desejada, horario_desejado, horario_inicial, horario_final
+        )
+        print(f"Worker finalizou tarefa de verificação. Resultado: {result}")
+        return result
+    except Exception as e:
+        print(f"Erro ao processar tarefa de verificação: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        availabilityChecker.quit()
 
 
 @shared_task(name="get_patient_history_task")

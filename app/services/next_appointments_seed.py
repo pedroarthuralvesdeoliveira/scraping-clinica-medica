@@ -46,8 +46,11 @@ class NextAppointmentsService:
                     # Based on next_appointments.py, it seems to login to a specific URL.
                     
                     # Find patient
+                    codigo_int = int(codigo_str) if codigo_str.isdigit() else None
+                    if not codigo_int:
+                        continue
                     patient = session.query(DadosCliente).filter(
-                        DadosCliente.codigo == int(codigo_str) if codigo_str.isdigit() else None
+                        DadosCliente.codigo == codigo_int
                     ).first()
 
                     # Find or create professional

@@ -30,7 +30,7 @@ class PatientCPFSyncService:
             self.scraper._login()
             self.scraper._close_modal()
             if not self.scraper.prepare_patient_registration_search():
-                return {"status": "error", "message": "Could not prepare patient search modal."}
+                raise Exception("Could not prepare patient search modal.")
 
             updated_count = 0
             failed_count = 0

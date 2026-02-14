@@ -1,6 +1,5 @@
 from ..core.dependencies import get_settings
 from celery import Celery
-from celery.schedules import crontab
 
 settings = get_settings()
 
@@ -22,10 +21,6 @@ celery.conf.update(
     result_serializer="json",
     timezone="America/Sao_Paulo",
     enable_utc=True,
-    beat_schedule={
-        "sync-all-recent-patients-every-30-minutes": {
-            "task": "sync_all_recent_patients_task",
-            "schedule": crontab(minute="*/30"),
-        },
-    },
+    task_soft_time_limit=300,
+    task_time_limit=600,
 )
