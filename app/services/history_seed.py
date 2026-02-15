@@ -11,22 +11,25 @@ class AppointmentHistoryService:
     def __init__(self):
         self.scraper = PatientHistoryScraper()
 
-    def seed_history(self, offset: int = 0, limit: int | None = None, sistema_filter: str | None = None) -> dict:
+    def seed_history(self, offset: int = 0, limit: int | None = None, sistema_filter: str | None = None, skip_if_has_recent_history: bool = False, days_threshold: int = 7) -> dict:
         """
         Seeds appointment history from the scraper.
-        
+
         Args:
             offset: Number of patients to skip (for parallel processing)
             limit: Maximum number of patients to process (None = all)
             sistema_filter: Filter by system ('ouro', 'of', or None for both)
+            skip_if_has_recent_history: If True, skip patients who already have a recent appointment in DB
+            days_threshold: Number of days to consider as "recent" (default: 7)
         """
-        print(f"Starting appointment history seed process (offset={offset}, limit={limit}, sistema={sistema_filter or 'all'})...")
-        
+        print(f"Starting appointment history seed process (offset={offset}, limit={limit}, sistema={sistema_filter or 'all'}, skip_recent={skip_if_has_recent_history}, days={days_threshold})...")
+
         session = get_session()
         stats = {
             "total_patients_processed": 0,
             "appointments_added": 0,
             "appointments_skipped_existing": 0,
+            "patients_skipped_has_recent": 0,
             "errors": 0
         }
 
@@ -66,6 +69,17 @@ class AppointmentHistoryService:
 
                 for patient in patients:
                     try:
+                        if skip_if_has_recent_history:
+                            from datetime import timedelta, date
+                            cutoff = date.today() - timedelta(days=days_threshold)
+                            recent = session.query(Agendamento).filter(
+                                Agendamento.paciente_id == patient.id,
+                                Agendamento.data_consulta >= cutoff,
+                            ).first()
+                            if recent:
+                                stats["patients_skipped_has_recent"] += 1
+                                continue
+
                         stats["total_patients_processed"] += 1
                         print(f"Scraping history for patient {patient.codigo} (ID: {patient.id})...")
 
