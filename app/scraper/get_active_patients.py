@@ -295,7 +295,15 @@ class GetActivePatients(Browser):
             except:
                 self.execute_script("arguments[0].click();", botao)
 
-            time.sleep(5)
+            # Aguarda o arquivo aparecer (até 30s)
+            folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+            for i in range(30):
+                if glob.glob(os.path.join(folder_path, "*.xls")):
+                    print(f"Arquivo baixado após {i+1}s.")
+                    break
+                time.sleep(1)
+            else:
+                print("AVISO: Nenhum .xls apareceu em 30s, continuando mesmo assim...")
 
             print("Exportou os dados do Excel.")
 
@@ -308,10 +316,7 @@ class GetActivePatients(Browser):
 
     def get_excel_data(self):
         try:
-            time.sleep(5)
-            folder_path = (
-                "/home/pedro/freelas/visualsoft/scraping-clinica-medica/app/scraper/data"
-            )
+            folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
             xls_files = glob.glob(os.path.join(folder_path, "*.xls"))
             if not xls_files:
                 return {
