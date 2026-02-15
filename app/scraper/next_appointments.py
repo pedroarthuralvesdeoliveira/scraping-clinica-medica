@@ -200,7 +200,16 @@ class NextAppointmentsScraper(Browser):
                 "message": "Falha ao exportar relatório.",
             }
 
-        time.sleep(5)
+        # Aguarda o arquivo ser criado (até 30s)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        full_path = os.path.join(base_dir, "data", "26relatorio.xls")
+        for i in range(30):
+            if os.path.exists(full_path) and os.path.getsize(full_path) > 0:
+                print(f"Arquivo baixado após {i+1}s: {full_path}")
+                break
+            time.sleep(1)
+        else:
+            print("AVISO: Arquivo não apareceu em 30s, continuando mesmo assim...")
 
     def get_excel_data(self):
         try:
@@ -209,9 +218,23 @@ class NextAppointmentsScraper(Browser):
             folder_path = os.path.join(base_dir, "data")
             file_name = "26relatorio.xls"
             full_path = os.path.join(folder_path, file_name)
+
+            if not os.path.exists(full_path):
+                print(f"Arquivo não encontrado: {full_path}")
+                return {"status": "error", "message": "Arquivo Excel não encontrado."}
+
+            print(f"Lendo arquivo: {full_path} ({os.path.getsize(full_path)} bytes)")
             df = pd.read_excel(full_path, engine="calamine", skiprows=1)
 
             df.columns = [str(c).strip() for c in df.columns]
+            print(f"Colunas encontradas: {list(df.columns)}")
+
+            if "DATA/HORA" not in df.columns:
+                print(f"Coluna 'DATA/HORA' não encontrada. Tentando sem skiprows...")
+                df = pd.read_excel(full_path, engine="calamine")
+                df.columns = [str(c).strip() for c in df.columns]
+                print(f"Colunas sem skiprows: {list(df.columns)}")
+
             df_limpo = df[
                 df["DATA/HORA"].astype(str).str.contains(r"\d{2}/\d{2}/\d{4}", na=False)
             ].copy()
