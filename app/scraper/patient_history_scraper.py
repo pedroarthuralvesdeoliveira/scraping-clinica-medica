@@ -406,22 +406,25 @@ class PatientHistoryScraper(Browser):
             time.sleep(2)
 
             patient_info = None
-            results_cells = self.find_elements(
-                By.XPATH,
-                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)][1]/td"
-            )
-            if len(results_cells) >= 2:
-                codigo_text = results_cells[0].text.strip()
-                nome_text = results_cells[1].text.strip()
-                if codigo_text.isdigit():
-                    patient_info = {"codigo": codigo_text, "nome": nome_text}
-                    print(f"Patient info extracted: codigo={codigo_text}, nome={nome_text}")
-
             botao_historico = self.wait_for_element(
                 By.XPATH, "//button[@title='Visualizar Histórico do Paciente.']"
             )
 
             if botao_historico:
+                # Extract patient info from the same row as the history button
+                try:
+                    row_cells = botao_historico.find_elements(
+                        By.XPATH, "./ancestor::tr/td"
+                    )
+                    if len(row_cells) >= 2:
+                        codigo_text = row_cells[0].text.strip()
+                        nome_text = row_cells[1].text.strip()
+                        if codigo_text.isdigit():
+                            patient_info = {"codigo": codigo_text, "nome": nome_text}
+                            print(f"Patient info extracted: codigo={codigo_text}, nome={nome_text}")
+                except Exception as e:
+                    print(f"Could not extract patient info from row: {e}")
+
                 try:
                     botao_historico.click()
                 except:
