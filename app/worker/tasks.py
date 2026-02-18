@@ -352,18 +352,29 @@ def search_patient_history_task(search_type: str, search_value: str):
                 print(f"Erro no scraping de {sistema_str}: {e}")
                 continue
 
-        # Sort by date descending (most recent first)
-        all_appointments.sort(
-            key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y"),
-            reverse=True,
-        )
+        # Group appointments by sistema and embed in each patient
+        apts_by_sistema = {}
+        for apt in all_appointments:
+            apts_by_sistema.setdefault(apt["sistema"], []).append(apt)
+
+        # Sort each group by date descending
+        for sistema_apts in apts_by_sistema.values():
+            sistema_apts.sort(
+                key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y"),
+                reverse=True,
+            )
+
+        patients_with_apts = []
+        for p in patients_found:
+            entry = dict(p)
+            entry["appointments"] = apts_by_sistema.get(p["sistema"], [])
+            patients_with_apts.append(entry)
 
         return {
             "status": "success",
             "search_type": search_type,
             "search_value": search_value,
-            "patients_found": patients_found,
-            "appointments": all_appointments,
+            "patients": patients_with_apts,
             "total_count": len(all_appointments),
         }
 
