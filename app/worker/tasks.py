@@ -225,7 +225,7 @@ def search_patient_history_task(search_type: str, search_value: str):
     from app.models.dados_cliente import DadosCliente
     from app.models.telefones_paciente import TelefonesPaciente
     from app.models.enums import SistemaOrigem
-    from datetime import datetime, date
+    from datetime import datetime
     from sqlalchemy import or_
     import re
 
@@ -243,7 +243,6 @@ def search_patient_history_task(search_type: str, search_value: str):
     scraper = PatientHistoryScraper()
     all_appointments = []
     patients_found = []
-    today = date.today()
 
     try:
         for sistema_str in ["OF", "OURO"]:
@@ -302,23 +301,12 @@ def search_patient_history_task(search_type: str, search_value: str):
                 if result.get("status") == "success":
                     appointments = result.get("appointments", [])
 
-                    # Filter future appointments only
-                    future_appointments = []
                     for apt in appointments:
-                        try:
-                            apt_date = datetime.strptime(
-                                apt["data_atendimento"], "%d/%m/%Y"
-                            ).date()
-                            if apt_date >= today:
-                                apt["sistema"] = sistema_str
-                                future_appointments.append(apt)
-                        except (ValueError, KeyError):
-                            continue
+                        apt["sistema"] = sistema_str
 
-                    all_appointments.extend(future_appointments)
+                    all_appointments.extend(appointments)
                     print(
-                        f"Encontrados {len(appointments)} total, "
-                        f"{len(future_appointments)} futuros em {sistema_str}."
+                        f"Encontrados {len(appointments)} agendamentos em {sistema_str}."
                     )
                 else:
                     print(
@@ -329,9 +317,10 @@ def search_patient_history_task(search_type: str, search_value: str):
                 print(f"Erro no scraping de {sistema_str}: {e}")
                 continue
 
-        # Sort by date ascending
+        # Sort by date descending (most recent first)
         all_appointments.sort(
-            key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y")
+            key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y"),
+            reverse=True,
         )
 
         return {

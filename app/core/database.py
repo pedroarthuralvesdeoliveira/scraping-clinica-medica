@@ -10,7 +10,11 @@ Base = declarative_base()
 @lru_cache
 def get_engine():
     settings = Settings()
-    engine = create_engine(settings.database_url, pool_pre_ping=True)
+    db_url = settings.database_url
+    # SQLAlchemy 1.4+ removed the 'postgres' dialect alias; normalize to 'postgresql'
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(db_url, pool_pre_ping=True)
     return engine
 
 
