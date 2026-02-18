@@ -405,6 +405,18 @@ class PatientHistoryScraper(Browser):
 
             time.sleep(2)
 
+            patient_info = None
+            results_cells = self.find_elements(
+                By.XPATH,
+                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)][1]/td"
+            )
+            if len(results_cells) >= 2:
+                codigo_text = results_cells[0].text.strip()
+                nome_text = results_cells[1].text.strip()
+                if codigo_text.isdigit():
+                    patient_info = {"codigo": codigo_text, "nome": nome_text}
+                    print(f"Patient info extracted: codigo={codigo_text}, nome={nome_text}")
+
             botao_historico = self.wait_for_element(
                 By.XPATH, "//button[@title='Visualizar Histórico do Paciente.']"
             )
@@ -488,10 +500,10 @@ class PatientHistoryScraper(Browser):
             if len(appointments) == 0:
                 print(f"No appointments found for {search_type.upper()} {identifier}.")
                 self.save_screenshot("patient_history_no_appointments.png")
-                return {"status": "success", "appointments": []}
+                return {"status": "success", "appointments": [], "patient_info": patient_info}
 
             print(f"Found {len(appointments)} appointments for {search_type.upper()} {identifier}.")
-            return {"status": "success", "appointments": appointments}
+            return {"status": "success", "appointments": appointments, "patient_info": patient_info}
 
         except TimeoutException as e:
             print(f"Timeout while fetching patient history: {e}")

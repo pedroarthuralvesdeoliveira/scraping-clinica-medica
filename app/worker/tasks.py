@@ -308,6 +308,41 @@ def search_patient_history_task(search_type: str, search_value: str):
                     print(
                         f"Encontrados {len(appointments)} agendamentos em {sistema_str}."
                     )
+
+                    if patient is None:
+                        scraped = result.get("patient_info")
+                        if scraped and scraped.get("codigo"):
+                            found = session.query(DadosCliente).filter(
+                                DadosCliente.codigo == int(scraped["codigo"]),
+                                DadosCliente.sistema_origem == sistema_enum,
+                            ).first()
+                            if found:
+                                try:
+                                    dob = datetime.strptime(search_value, "%d/%m/%Y").date()
+                                    found.data_nascimento = dob
+                                    session.commit()
+                                    print(
+                                        f"data_nascimento atualizada para paciente "
+                                        f"codigo={found.codigo}, sistema={sistema_str}"
+                                    )
+                                except Exception as e:
+                                    session.rollback()
+                                    print(f"Erro ao atualizar data_nascimento: {e}")
+                                patients_found.append({
+                                    "id": found.id,
+                                    "nome": found.nomewpp,
+                                    "codigo": found.codigo,
+                                    "sistema": sistema_str,
+                                    "source": "database_updated",
+                                })
+                            else:
+                                patients_found.append({
+                                    "id": None,
+                                    "nome": scraped.get("nome"),
+                                    "codigo": scraped.get("codigo"),
+                                    "sistema": sistema_str,
+                                    "source": "scraper",
+                                })
                 else:
                     print(
                         f"Scraper retornou erro para {sistema_str}: "
