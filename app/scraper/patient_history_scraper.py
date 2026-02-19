@@ -587,27 +587,34 @@ class PatientHistoryScraper(Browser):
                     search_field.send_keys(Keys.ENTER)
                 time.sleep(2)
 
-            # Wait for results table to populate (AJAX) before collecting rows.
-            # Any row — including the "no results" message row — satisfies this wait.
+            # Wait for history buttons to appear (same proven strategy as get_patient_history).
+            # Returns None if no matching patients — find_elements below will return [].
             self.wait_for_element(
                 By.XPATH,
-                "//div[@id='divGradePesquisaPaciente']//table//tr[td]",
+                "//button[@title='Visualizar Histórico do Paciente.']",
                 timeout=10,
             )
 
-            rows = self.find_elements(
+            import re as _re
+            buttons = self.find_elements(
                 By.XPATH,
-                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)]",
+                "//button[@title='Visualizar Histórico do Paciente.']",
             )
 
             patients = []
-            for row in rows:
-                cells = row.find_elements(By.TAG_NAME, "td")
-                if len(cells) >= 2:
-                    code = cells[0].text.strip()
-                    nome = cells[1].text.strip()
-                    if code.isdigit():
-                        patients.append({"codigo": code, "nome": nome})
+            for btn in buttons:
+                try:
+                    onclick = btn.get_attribute("onclick") or ""
+                    match = _re.search(r'\((\d+)\)', onclick)
+                    if not match:
+                        continue
+                    code = match.group(1)
+                    row = btn.find_element(By.XPATH, "./ancestor::tr")
+                    cells = row.find_elements(By.TAG_NAME, "td")
+                    nome = cells[1].text.strip() if len(cells) >= 2 else ""
+                    patients.append({"codigo": code, "nome": nome})
+                except Exception as btn_err:
+                    print(f"Erro ao extrair código do botão: {btn_err}")
 
             print(
                 f"get_patient_codes_from_search: {len(patients)} paciente(s) "
