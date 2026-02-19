@@ -587,6 +587,14 @@ class PatientHistoryScraper(Browser):
                     search_field.send_keys(Keys.ENTER)
                 time.sleep(2)
 
+            # Wait for results table to populate (AJAX) before collecting rows.
+            # Any row — including the "no results" message row — satisfies this wait.
+            self.wait_for_element(
+                By.XPATH,
+                "//div[@id='divGradePesquisaPaciente']//table//tr[td]",
+                timeout=10,
+            )
+
             rows = self.find_elements(
                 By.XPATH,
                 "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)]",
