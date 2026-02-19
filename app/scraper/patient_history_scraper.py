@@ -526,6 +526,93 @@ class PatientHistoryScraper(Browser):
                 self._on_search_screen = False
             print("History fetch cycle ended.")
 
+    def get_patient_codes_from_search(self, identifier: str, search_type: str) -> list[dict]:
+        """
+        Performs a search and returns ALL matching patient codes/names from the results table.
+        Used when multiple patients may share the same search value (e.g., data_nascimento).
+        Returns list of {"codigo": str, "nome": str}.
+        """
+        try:
+            self.ensure_logged_in()
+            self.ensure_on_patient_search()
+
+            search_patient = self.wait_for_element(
+                By.ID,
+                "tipoPesquisaPacienteGrade",
+                expectation=EC.element_to_be_clickable,
+            )
+            if search_patient:
+                select = Select(search_patient)
+                type_map = {
+                    "cpf": "Cpf",
+                    "nome": "Nome",
+                    "codigo": "Código",
+                    "prontuario": "Prontuário",
+                    "telefone": "Telefone",
+                    "datanascimento": "Data Nascimento",
+                    "data_nascimento": "Data Nascimento",
+                    "datanascimento": "Data Nascimento",
+                }
+                value_map = {
+                    "data_nascimento": "dataNascimento",
+                    "datanascimento": "dataNascimento",
+                }
+                visible_text = type_map.get(search_type.lower(), search_type.capitalize())
+                try:
+                    select.select_by_visible_text(visible_text)
+                except Exception:
+                    option_value = value_map.get(search_type.lower(), search_type.lower())
+                    select.select_by_value(option_value)
+                time.sleep(1)
+
+            search_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade")
+            if search_field:
+                search_field.clear()
+                time.sleep(0.5)
+                try:
+                    search_field.send_keys(identifier)
+                except Exception:
+                    self.execute_script(
+                        "arguments[0].value = arguments[1];", search_field, identifier
+                    )
+                time.sleep(1)
+
+                search_button = self.wait_for_element(By.ID, "btPesquisaPacienteGrade1")
+                if search_button:
+                    try:
+                        search_button.click()
+                    except Exception:
+                        self.execute_script("arguments[0].click();", search_button)
+                else:
+                    search_field.send_keys(Keys.ENTER)
+                time.sleep(2)
+
+            rows = self.find_elements(
+                By.XPATH,
+                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)]",
+            )
+
+            patients = []
+            for row in rows:
+                cells = row.find_elements(By.TAG_NAME, "td")
+                if len(cells) >= 2:
+                    code = cells[0].text.strip()
+                    nome = cells[1].text.strip()
+                    if code.isdigit():
+                        patients.append({"codigo": code, "nome": nome})
+
+            print(
+                f"get_patient_codes_from_search: {len(patients)} paciente(s) "
+                f"encontrado(s) para {search_type}={identifier}"
+            )
+            self._on_search_screen = True
+            return patients
+
+        except Exception as e:
+            print(f"Erro em get_patient_codes_from_search: {e}")
+            return []
+
+
 if __name__ == "__main__":
     scraper = PatientHistoryScraper()
     codigo = scraper.get_patient_history("761", "codigo")

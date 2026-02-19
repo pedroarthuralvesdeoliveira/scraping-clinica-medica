@@ -245,6 +245,18 @@ def search_patient_history_task(search_type: str, search_value: str):
     patients_found = []
 
     try:
+        if search_type == "data_nascimento":
+            patients_with_apts = _search_by_birth_date(
+                session, scraper, search_value, SistemaOrigem
+            )
+            return {
+                "status": "success",
+                "search_type": search_type,
+                "search_value": search_value,
+                "patients": patients_with_apts,
+                "total_count": sum(len(p["appointments"]) for p in patients_with_apts),
+            }
+
         for sistema_str in ["OF", "OURO"]:
             sistema_enum = SistemaOrigem(sistema_str)
             print(f"\n--- Processando sistema: {sistema_str} ---")
@@ -384,6 +396,84 @@ def search_patient_history_task(search_type: str, search_value: str):
     finally:
         session.close()
         scraper.quit()
+
+
+def _search_by_birth_date(session, scraper, birth_date_str: str, SistemaOrigem) -> list[dict]:
+    """
+    Searches for ALL patients matching a birth date across OF and OURO systems.
+    For each match, retrieves appointment history by patient code.
+    Returns list of patient dicts each with their own 'appointments' list.
+    """
+    from app.models.dados_cliente import DadosCliente
+    from datetime import datetime
+
+    results = []
+
+    for sistema_str in ["OF", "OURO"]:
+        sistema_enum = SistemaOrigem(sistema_str)
+        scraper.set_sistema(sistema_str)
+        print(f"\n--- Busca por data_nascimento no sistema: {sistema_str} ---")
+
+        # Get all matching codes from the website search
+        website_patients = scraper.get_patient_codes_from_search(
+            birth_date_str, "data_nascimento"
+        )
+
+        if not website_patients:
+            print(f"Nenhum paciente encontrado no site {sistema_str} para {birth_date_str}.")
+            continue
+
+        for wp in website_patients:
+            codigo_int = int(wp["codigo"])
+
+            # Check if patient exists in DB
+            db_patient = session.query(DadosCliente).filter(
+                DadosCliente.codigo == codigo_int,
+                DadosCliente.sistema_origem == sistema_enum,
+            ).first()
+
+            source = "database" if db_patient else "scraper"
+
+            # Update data_nascimento in DB if missing
+            if db_patient and not db_patient.data_nascimento:
+                try:
+                    dob = datetime.strptime(birth_date_str, "%d/%m/%Y").date()
+                    db_patient.data_nascimento = dob
+                    session.commit()
+                    print(f"data_nascimento atualizada para codigo={codigo_int}, sistema={sistema_str}")
+                except Exception as e:
+                    session.rollback()
+                    print(f"Erro ao atualizar data_nascimento: {e}")
+
+            # Scrape history by code (unique result, no ambiguity)
+            try:
+                result = scraper.get_patient_history(wp["codigo"], search_type="codigo")
+            except Exception as e:
+                print(f"Erro ao buscar histórico do codigo {wp['codigo']}: {e}")
+                result = {"status": "error"}
+
+            appointments: list = []
+            if result.get("status") == "success":
+                raw = result.get("appointments")
+                appointments = raw if isinstance(raw, list) else []
+                for apt in appointments:
+                    apt["sistema"] = sistema_str
+                appointments.sort(
+                    key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y"),
+                    reverse=True,
+                )
+                print(f"  {len(appointments)} agendamento(s) para {wp['nome']} ({sistema_str})")
+
+            results.append({
+                "id": db_patient.id if db_patient else None,
+                "nome": db_patient.nomewpp if db_patient else wp["nome"],
+                "codigo": codigo_int,
+                "sistema": sistema_str,
+                "source": source,
+                "appointments": appointments,
+            })
+
+    return results
 
 
 def _find_patient_in_db(session, search_type, search_value, sistema_enum):
