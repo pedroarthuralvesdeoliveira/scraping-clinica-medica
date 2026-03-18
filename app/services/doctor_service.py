@@ -7,24 +7,25 @@ def get_or_create_professional(session, nome_medico: str, sistema_origem) -> int
     """
     if not nome_medico:
         return None
-        
+
+    # Normaliza sistema_origem para string antes de qualquer operação
+    sistema_str = sistema_origem.value if hasattr(sistema_origem, 'value') else sistema_origem
+
     # Tenta achar existente
     profissional = session.query(Profissional).filter_by(
         nome_exibicao=nome_medico,
-        sistema_origem=sistema_origem
+        sistema_origem=sistema_str
     ).first()
 
     if profissional:
         return profissional.id
 
-    # Se não existir, cria (Upsert simplificado)
-    # Nota: Como não temos o CRM ou Código externo vindo do histórico, 
-    # usamos o nome como identificador temporário.
+    # Se não existir, cria
     new_prof = Profissional(
         nome_completo=nome_medico,
         nome_exibicao=nome_medico,
-        especialidade="Não Identificada", # O scraper do histórico não traz especialidade
-        sistema_origem=sistema_origem.value if hasattr(sistema_origem, 'value') else sistema_origem,  # Convert enum to string
+        especialidade="Não Identificada",
+        sistema_origem=sistema_str,
         codigo=None,
         ativo=True
     )
