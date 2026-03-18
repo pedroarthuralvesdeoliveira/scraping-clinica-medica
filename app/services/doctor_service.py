@@ -11,10 +11,10 @@ def get_or_create_professional(session, nome_medico: str, sistema_origem) -> int
     # Normaliza sistema_origem para string antes de qualquer operação
     sistema_str = sistema_origem.value if hasattr(sistema_origem, 'value') else sistema_origem
 
-    # Tenta achar existente
+    # Busca por nome_completo (independente de sistema_origem) para evitar duplicatas
+    # entre registros cadastrados manualmente e os vindos do scraper
     profissional = session.query(Profissional).filter_by(
-        nome_exibicao=nome_medico,
-        sistema_origem=sistema_str
+        nome_completo=nome_medico,
     ).first()
 
     if profissional:
