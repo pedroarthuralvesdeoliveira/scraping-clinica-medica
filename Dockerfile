@@ -68,6 +68,8 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
 
 COPY --from=python_deps /opt/venv /opt/venv
 
+RUN chmod +x /opt/venv/lib/python3.13/site-packages/selenium/webdriver/common/linux/selenium-manager || true
+
 COPY . .
 
 ENV PATH="/opt/venv/bin:$PATH"

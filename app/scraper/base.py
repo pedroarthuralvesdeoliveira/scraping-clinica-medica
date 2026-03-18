@@ -4,9 +4,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from ..core.dependencies import get_settings
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 class Browser:
@@ -46,7 +48,8 @@ class Browser:
         options.add_experimental_option("useAutomationExtension", False)
         options.set_capability("pageLoadStrategy", "normal")
 
-        self.driver = webdriver.Chrome(options=options)
+        service = Service(ChromeDriverManager().install())
+        self.driver = webdriver.Chrome(service=service, options=options)
         self.driver.set_page_load_timeout(180)
         self.driver.implicitly_wait(10)
         self.settings = get_settings()
