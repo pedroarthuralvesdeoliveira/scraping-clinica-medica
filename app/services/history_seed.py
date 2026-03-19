@@ -90,6 +90,16 @@ class AppointmentHistoryService:
                             stats["errors"] += 1
                             continue
 
+                        # Update birth date if missing and scraper returned one
+                        scraped_info = result.get("patient_info") or {}
+                        dob_str = scraped_info.get("data_nascimento")
+                        if dob_str and not patient.data_nascimento:
+                            try:
+                                patient.data_nascimento = datetime.strptime(dob_str, "%d/%m/%Y").date()
+                                print(f"Updated data_nascimento for patient {patient.codigo}: {patient.data_nascimento}")
+                            except ValueError:
+                                print(f"Could not parse data_nascimento '{dob_str}' for patient {patient.codigo}")
+
                         appointments = result.get("appointments", [])
                         
                         for apt_data in appointments:

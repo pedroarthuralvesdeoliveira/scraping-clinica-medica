@@ -1,12 +1,12 @@
-from selenium.common import StaleElementReferenceException
 import time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select, WebDriverWait
 
+from selenium.common import StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from app.scraper.base import Browser
 
@@ -30,7 +30,7 @@ class PatientHistoryScraper(Browser):
         try:
             # Selector específico para a paginação do histórico
             pagination_xpath = "//ul[@class='pagination'][.//a[contains(@href, 'scriptTrilhaAuditoriaAgenda')]]"
-            
+
             # 1. Verifica se já está na última página
             if self.is_last_page():
                 print("Já estamos na última página do histórico. Encerrando.")
@@ -38,31 +38,34 @@ class PatientHistoryScraper(Browser):
 
             # 2. Busca o elemento atual DENTRO da paginação correta
             current_page_elem = self.wait_for_element(
-                By.XPATH, 
-                f"{pagination_xpath}//a[@class='paginaAtual']"
+                By.XPATH, f"{pagination_xpath}//a[@class='paginaAtual']"
             )
             if not current_page_elem:
                 return False
-            
+
             current_val = int(current_page_elem.get_attribute("data-value"))
             next_val = current_val + 1
-            
+
             print(f"Navegando: da página {current_val + 1} para {next_val + 1}")
 
             # 3. Dispara o script (AJAX)
-            self.execute_script(f"scriptTrilhaAuditoriaAgenda.pesquisaPorPagina({next_val});")
+            self.execute_script(
+                f"scriptTrilhaAuditoriaAgenda.pesquisaPorPagina({next_val});"
+            )
 
             # 4. Aguarda a página atualizar (o data-value do elemento paginaAtual deve mudar)
             def wait_for_page_change(driver):
                 try:
-                    elem = driver.find_element(By.XPATH, f"{pagination_xpath}//a[@class='paginaAtual']")
+                    elem = driver.find_element(
+                        By.XPATH, f"{pagination_xpath}//a[@class='paginaAtual']"
+                    )
                     return int(elem.get_attribute("data-value")) == next_val
                 except:
                     return False
 
             WebDriverWait(self.driver, 10).until(wait_for_page_change)
             print(f"Página {next_val + 1} carregada com sucesso.")
-            
+
             return True
 
         except Exception as e:
@@ -72,62 +75,73 @@ class PatientHistoryScraper(Browser):
 
     def is_last_page(self):
         import re
+
         try:
             pagination_xpath = "//ul[@class='pagination'][.//a[contains(@href, 'scriptTrilhaAuditoriaAgenda')]]"
-            
+
             # Encontrar a página atual no componente correto
-            current_page_elements = self.find_elements(By.XPATH, f"{pagination_xpath}//a[@class='paginaAtual']")
+            current_page_elements = self.find_elements(
+                By.XPATH, f"{pagination_xpath}//a[@class='paginaAtual']"
+            )
             if not current_page_elements:
                 return True
-            
+
             current_page_elem = current_page_elements[0]
-            
+
             # Encontrar o botão "Última" no componente correto
-            last_page_elements = self.find_elements(By.XPATH, f"{pagination_xpath}//a[contains(text(), 'Última')]")
+            last_page_elements = self.find_elements(
+                By.XPATH, f"{pagination_xpath}//a[contains(text(), 'Última')]"
+            )
             if not last_page_elements:
                 return True
-            
+
             last_page_elem = last_page_elements[0]
             current_href = current_page_elem.get_attribute("href")
             last_href = last_page_elem.get_attribute("href")
-            
+
             # Regra 1: Comparação de href
             if current_href and last_href and current_href == last_href:
                 print(f"Fim da paginação (href): {current_href}")
                 return True
 
             # Regra 2: Extrair total de "Última (N)"
-            match = re.search(r'\((\d+)\)', last_page_elem.text)
+            match = re.search(r"\((\d+)\)", last_page_elem.text)
             if match:
                 total_pages = int(match.group(1))
                 current_text = current_page_elem.text.strip()
                 if current_text.isdigit() and int(current_text) >= total_pages:
                     print(f"Fim da paginação (texto): {current_text} de {total_pages}")
                     return True
-                
+
             # Regra 3: Botão "Next" aponta para a mesma página atual (ou não existe)
-            next_page_elements = self.find_elements(By.XPATH, f"{pagination_xpath}//a[@aria-label='Next']")
+            next_page_elements = self.find_elements(
+                By.XPATH, f"{pagination_xpath}//a[@aria-label='Next']"
+            )
             if not next_page_elements:
                 return True
-            
+
             next_href = next_page_elements[0].get_attribute("href")
             if next_href == current_href:
                 print("Fim da paginação (Next button mesmo href)")
                 return True
-                
+
             return False
         except Exception as e:
             print(f"Erro is_last_page: {e}")
             return True
 
-    def prepare_patient_search(self, force_login=False, patient_type: str ="cpf"):
+    def prepare_patient_search(self, force_login=False, patient_type: str = "cpf"):
         """
         Navigates to the patient search screen.
         If force_login is True, it will perform login even if already logged in.
         """
         try:
             current_url = self.driver.current_url or ""
-            if force_login or "softclyn.com" not in current_url or "login" in current_url:
+            if (
+                force_login
+                or "softclyn.com" not in current_url
+                or "login" in current_url
+            ):
                 print(f"Login required (current URL: {current_url}). Logging in...")
                 self._login(medico=None)
                 self._close_modal()
@@ -135,7 +149,9 @@ class PatientHistoryScraper(Browser):
 
                 print("Navigating to patient history search screen...")
                 pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
-                prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
+                prontuario_menu = self.wait_for_element(
+                    By.XPATH, pesquisa_paciente_xpath
+                )
                 if prontuario_menu:
                     try:
                         prontuario_menu.click()
@@ -146,7 +162,7 @@ class PatientHistoryScraper(Browser):
                 By.ID,
                 "tipoPesquisaPacienteGrade",
                 expectation=EC.element_to_be_clickable,
-                timeout=20
+                timeout=20,
             )
 
             if search_patient_elem:
@@ -163,18 +179,22 @@ class PatientHistoryScraper(Browser):
                     "data_nascimento": "dataNascimento",
                     "datanascimento": "dataNascimento",
                 }
-                visible_text = type_text_map.get(patient_type.lower(), patient_type.capitalize())
+                visible_text = type_text_map.get(
+                    patient_type.lower(), patient_type.capitalize()
+                )
 
                 try:
                     select.select_by_visible_text(visible_text)
                 except:
-                    option_value = type_value_map.get(patient_type.lower(), patient_type.lower())
+                    option_value = type_value_map.get(
+                        patient_type.lower(), patient_type.lower()
+                    )
                     select.select_by_value(option_value)
 
                 time.sleep(1)
                 print(f"Patient search screen ready (type: {visible_text}).")
                 return True
-            
+
             print("Failed to find patient search field 'tipoPesquisaPacienteGrade'.")
             return False
 
@@ -227,7 +247,7 @@ class PatientHistoryScraper(Browser):
             # Usually the first column of the first row in the results table
             codigo_elem = self.find_element(
                 By.XPATH,
-                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)][1]/td[1]"
+                "//div[@id='divGradePesquisaPaciente']//table//tr[td and not(th)][1]/td[1]",
             )
 
             if codigo_elem:
@@ -244,14 +264,13 @@ class PatientHistoryScraper(Browser):
             print(f"Error in get_patient_by_type: {e}")
             return None
 
-
     def ensure_logged_in(self):
         """
         Ensures we are logged into the correct system.
         Only performs login if not already logged in or if system changed.
         """
         target_system = self.current_system.lower()
-        
+
         # Check if we're already logged into the correct system
         if self._logged_in_system == target_system:
             # Verify we're still on a valid page (not logged out)
@@ -259,7 +278,7 @@ class PatientHistoryScraper(Browser):
             if "softclyn.com" in current_url and "login" not in current_url.lower():
                 print(f"Already logged into {target_system.upper()}, reusing session.")
                 return True
-        
+
         # Need to login (first time or system changed)
         print(f"Logging into system: {target_system.upper()}")
         self._login(medico=None)
@@ -275,25 +294,29 @@ class PatientHistoryScraper(Browser):
         """
         if self._on_search_screen:
             # Verify we're still on the search screen by checking for the search field
-            search_field = self.wait_for_element(By.ID, "pesquisaPacienteGrade", timeout=3)
+            search_field = self.wait_for_element(
+                By.ID, "pesquisaPacienteGrade", timeout=3
+            )
             if search_field:
                 print("Already on patient search screen, reusing.")
                 return True
             else:
                 # We're not on the search screen anymore, need to navigate
                 self._on_search_screen = False
-        
+
         # Navigate to patient search screen
         self._click_on_appointment_menu()
-        
-        pesquisa_paciente_xpath = "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
+
+        pesquisa_paciente_xpath = (
+            "//a[@href='#divPesquisaPaciente' and contains(text(),'Pesquisa Paciente')]"
+        )
         prontuario_menu = self.wait_for_element(By.XPATH, pesquisa_paciente_xpath)
         if prontuario_menu:
             try:
                 prontuario_menu.click()
             except:
                 self.execute_script("arguments[0].click();", prontuario_menu)
-        
+
         time.sleep(1)
         self._on_search_screen = True
         return True
@@ -307,7 +330,7 @@ class PatientHistoryScraper(Browser):
             close_button = self.wait_for_element(
                 By.XPATH,
                 "//div[contains(@class,'modal') and contains(@style,'display: block')]//button[@data-dismiss='modal']",
-                timeout=5
+                timeout=5,
             )
             if close_button:
                 try:
@@ -325,13 +348,13 @@ class PatientHistoryScraper(Browser):
         """
         Scrapes the patient's appointment history from the website.
         Returns a list of appointment dictionaries.
-        
+
         Optimized to reuse existing session - only logs in once per system.
         """
         try:
             # Ensure we're logged in (will skip if already logged into correct system)
             self.ensure_logged_in()
-            
+
             # Ensure we're on the patient search screen (will skip if already there)
             self.ensure_on_patient_search()
 
@@ -359,12 +382,16 @@ class PatientHistoryScraper(Browser):
                     "data_nascimento": "dataNascimento",
                     "datanascimento": "dataNascimento",
                 }
-                visible_text = type_map.get(search_type.lower(), search_type.capitalize())
+                visible_text = type_map.get(
+                    search_type.lower(), search_type.capitalize()
+                )
 
                 try:
                     select.select_by_visible_text(visible_text)
                 except:
-                    option_value = value_map.get(search_type.lower(), search_type.lower())
+                    option_value = value_map.get(
+                        search_type.lower(), search_type.lower()
+                    )
                     select.select_by_value(option_value)
                 time.sleep(2)
 
@@ -382,7 +409,9 @@ class PatientHistoryScraper(Browser):
                         "arguments[0].value = arguments[1];", search_field, identifier
                     )
 
-                print(f"{search_type.capitalize()} {identifier} entered in search field.")
+                print(
+                    f"{search_type.capitalize()} {identifier} entered in search field."
+                )
 
                 search_button = self.wait_for_element(
                     By.ID,
@@ -412,16 +441,24 @@ class PatientHistoryScraper(Browser):
 
             if botao_historico:
                 # Extract patient info from the same row as the history button
+                # Columns: Código[0], Nome[1], Telefone[2], Nascimento[3], Mãe[4], Opções[5+]
                 try:
                     row_cells = botao_historico.find_elements(
                         By.XPATH, "./ancestor::tr/td"
                     )
-                    if len(row_cells) >= 2:
+                    if len(row_cells) >= 4:
                         codigo_text = row_cells[0].text.strip()
                         nome_text = row_cells[1].text.strip()
+                        nascimento_text = row_cells[3].text.strip()
                         if codigo_text.isdigit():
-                            patient_info = {"codigo": codigo_text, "nome": nome_text}
-                            print(f"Patient info extracted: codigo={codigo_text}, nome={nome_text}")
+                            patient_info = {
+                                "codigo": codigo_text,
+                                "nome": nome_text,
+                                "data_nascimento": nascimento_text or None,
+                            }
+                            print(
+                                f"Patient info extracted: codigo={codigo_text}, nome={nome_text}, nascimento={nascimento_text}"
+                            )
                 except Exception as e:
                     print(f"Could not extract patient info from row: {e}")
 
@@ -445,19 +482,28 @@ class PatientHistoryScraper(Browser):
             while True:
                 page_count += 1
                 print(f"Processing page {page_count}/{max_pages}")
-                time.sleep(1)  
+                time.sleep(1)
 
-                self.wait_for_element(By.XPATH, "//table[contains(@class,'table-bordered')][.//td[contains(@class,'active')]]")
+                self.wait_for_element(
+                    By.XPATH,
+                    "//table[contains(@class,'table-bordered')][.//td[contains(@class,'active')]]",
+                )
 
                 tables = self.find_elements(
-                    By.XPATH, 
+                    By.XPATH,
                     # "//table[contains(@class,'table-bordered')]"
-                    "//table[contains(@class,'table-bordered')][.//td[contains(@class,'active') and contains(., 'Profissional')]]"
+                    "//table[contains(@class,'table-bordered')][.//td[contains(@class,'active') and contains(., 'Profissional')]]",
                 )
 
                 for table in tables:
-                    prof_elem = table.find_elements(By.XPATH, ".//td[contains(@class,'active')]//strong")
-                    profissional = prof_elem[0].text.replace("Profissional / Agenda:", "").strip() if prof_elem else "Desconhecido"
+                    prof_elem = table.find_elements(
+                        By.XPATH, ".//td[contains(@class,'active')]//strong"
+                    )
+                    profissional = (
+                        prof_elem[0].text.replace("Profissional / Agenda:", "").strip()
+                        if prof_elem
+                        else "Desconhecido"
+                    )
                     print(f"Found profissional: {profissional}")
 
                     # linhas = table.find_elements(By.XPATH, ".//tr[td and not(td[@colspan]) and not(th)]")
@@ -482,7 +528,7 @@ class PatientHistoryScraper(Browser):
                             linha.get_attribute("class") == "bg-danger"
                             and dta_atend_date < today
                         ):  # não compareceu
-                        # TODO: implementar também por última data no banco de dados 
+                            # TODO: implementar também por última data no banco de dados
                             continue
 
                         appointments.append(
@@ -494,19 +540,28 @@ class PatientHistoryScraper(Browser):
                                 "retorno_ate": colunas[7].text.strip(),
                             }
                         )
-                
+
                 if not self.go_to_next_page():
                     # print("Falha na navegação. Encerrando loop.")
                     break
-                
 
             if len(appointments) == 0:
                 print(f"No appointments found for {search_type.upper()} {identifier}.")
                 self.save_screenshot("patient_history_no_appointments.png")
-                return {"status": "success", "appointments": [], "patient_info": patient_info}
+                return {
+                    "status": "success",
+                    "appointments": [],
+                    "patient_info": patient_info,
+                }
 
-            print(f"Found {len(appointments)} appointments for {search_type.upper()} {identifier}.")
-            return {"status": "success", "appointments": appointments, "patient_info": patient_info}
+            print(
+                f"Found {len(appointments)} appointments for {search_type.upper()} {identifier}."
+            )
+            return {
+                "status": "success",
+                "appointments": appointments,
+                "patient_info": patient_info,
+            }
 
         except TimeoutException as e:
             print(f"Timeout while fetching patient history: {e}")
@@ -526,7 +581,9 @@ class PatientHistoryScraper(Browser):
                 self._on_search_screen = False
             print("History fetch cycle ended.")
 
-    def get_patient_codes_from_search(self, identifier: str, search_type: str) -> list[dict]:
+    def get_patient_codes_from_search(
+        self, identifier: str, search_type: str
+    ) -> list[dict]:
         """
         Performs a search and returns ALL matching patient codes/names from the results table.
         Used when multiple patients may share the same search value (e.g., data_nascimento).
@@ -557,11 +614,15 @@ class PatientHistoryScraper(Browser):
                     "data_nascimento": "dataNascimento",
                     "datanascimento": "dataNascimento",
                 }
-                visible_text = type_map.get(search_type.lower(), search_type.capitalize())
+                visible_text = type_map.get(
+                    search_type.lower(), search_type.capitalize()
+                )
                 try:
                     select.select_by_visible_text(visible_text)
                 except Exception:
-                    option_value = value_map.get(search_type.lower(), search_type.lower())
+                    option_value = value_map.get(
+                        search_type.lower(), search_type.lower()
+                    )
                     select.select_by_value(option_value)
                 time.sleep(1)
 
@@ -596,6 +657,7 @@ class PatientHistoryScraper(Browser):
             )
 
             import re as _re
+
             buttons = self.find_elements(
                 By.XPATH,
                 "//button[@title='Visualizar Histórico do Paciente.']",
@@ -605,7 +667,7 @@ class PatientHistoryScraper(Browser):
             for btn in buttons:
                 try:
                     onclick = btn.get_attribute("onclick") or ""
-                    match = _re.search(r'\((\d+)\)', onclick)
+                    match = _re.search(r"\((\d+)\)", onclick)
                     if not match:
                         continue
                     code = match.group(1)
@@ -630,5 +692,5 @@ class PatientHistoryScraper(Browser):
 
 if __name__ == "__main__":
     scraper = PatientHistoryScraper()
-    codigo = scraper.get_patient_history("761", "codigo")
+    codigo = scraper.get_patient_history("5547", "codigo")
     print(codigo)
