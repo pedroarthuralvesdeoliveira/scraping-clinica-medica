@@ -1,4 +1,5 @@
 from prefect import flow, task
+
 from app.services.history_seed import AppointmentHistoryService
 
 
@@ -6,6 +7,7 @@ def _get_patient_count(sistema_str: str) -> int:
     """Returns the number of patients for a given system."""
     from app.core.database import get_session
     from app.models.dados_cliente import DadosCliente
+
     session = get_session()
     try:
         return session.query(DadosCliente).filter_by(sistema_origem=sistema_str).count()
@@ -17,7 +19,7 @@ def _get_patient_count(sistema_str: str) -> int:
     name="Scrape History - Sistema/Chunk",
     retries=1,
     retry_delay_seconds=60,
-    description="Busca histórico de agendamentos para um sistema (com suporte a offset/limit para paralelismo)."
+    description="Busca histórico de agendamentos para um sistema (com suporte a offset/limit para paralelismo).",
 )
 def run_history_for_sistema(
     sistema_filter: str,
@@ -45,13 +47,13 @@ def run_history_for_sistema(
     name="Daily Appointment History Flow",
     log_prints=True,
 )
-def history_sync_flow(
-    skip_if_has_recent_history: bool = False,
-    days_threshold: int = 7,
-    workers_per_system: int = 1,
+async def history_sync_flow(
+    skip_if_has_recent_history: bool = True,
+    days_threshold: int = 30,
+    workers_per_system: int = 2,
 ):
     """
-    Flow para sincronizar histórico de agendamentos.
+    Flow para sincronizar histórico de agendamentos incremental.
 
     Args:
         skip_if_has_recent_history: Pula pacientes que já têm histórico recente no DB.
@@ -74,7 +76,9 @@ def history_sync_flow(
         else:
             total = _get_patient_count(sistema)
             chunk = max(1, -(-total // workers_per_system))  # ceil division
-            print(f"[{sistema}] {total} pacientes → {workers_per_system} workers, ~{chunk} por worker")
+            print(
+                f"[{sistema}] {total} pacientes → {workers_per_system} workers, ~{chunk} por worker"
+            )
             for i in range(workers_per_system):
                 offset = i * chunk
                 if offset >= total:
@@ -107,11 +111,15 @@ def history_sync_flow(
             total_processed += processed
             total_skipped += skipped
             total_errors += errors
-            print(f"  [{label}] +{added} agendamentos, {processed} pacientes, {errors} erros")
+            print(
+                f"  [{label}] +{added} agendamentos, {processed} pacientes, {errors} erros"
+            )
         else:
             print(f"  [{label}] ERRO: {result.get('message')}")
 
-    print(f"Histórico atualizado: {total_added} novos agendamentos, {total_processed} pacientes processados")
+    print(
+        f"Histórico atualizado: {total_added} novos agendamentos, {total_processed} pacientes processados"
+    )
     if skip_if_has_recent_history:
         print(f"  Pacientes pulados (histórico recente): {total_skipped}")
     if total_errors:

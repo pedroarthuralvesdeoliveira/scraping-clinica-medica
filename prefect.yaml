@@ -22,19 +22,6 @@ pull:
 
 # Deployments
 deployments:
-  - name: history-sync-15min
-    entrypoint: app/flows/history_flow.py:history_sync_flow
-    description: "Sincroniza histórico de agendamentos a cada 15 minutos (upsert: mantém existentes, adiciona novos)"
-    schedule:
-      cron: "*/15 * * * *"
-      timezone: America/Sao_Paulo
-    work_pool:
-      name: default
-    # Skip desabilitado por padrão - todos os pacientes são processados
-    # parameters:
-    #   skip_if_has_recent_history: false  # Opcional: true para otimizar
-    #   days_threshold: 7
-
   - name: next-appointments-hourly
     entrypoint: app/flows/next_appointments_flow.py:next_appointments_sync_flow
     description: "Sincroniza próximos agendamentos a cada hora"
