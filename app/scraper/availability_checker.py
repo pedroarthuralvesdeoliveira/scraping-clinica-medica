@@ -106,11 +106,9 @@ class AvailabilityChecker(Browser):
 
             print(f"Data selecionada: {data_desejada}. Verificando horários entre {horario_inicial} e {horario_final}.")
 
-            try:
-                self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+            no_expediente = self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+            if no_expediente:
                 return {"status": "unavailable", "message": f"A data {data_desejada} não tem expediente."}
-            except NoSuchElementException:
-                pass
 
             horario_inicial_id = int((horario_inicial or "07:00").replace(":", "") + "00")
             horario_final_id = int((horario_final or "19:30").replace(":", "") + "00")
@@ -165,12 +163,10 @@ class AvailabilityChecker(Browser):
                 print(f"Verificando data: {check_date_str_display}")
 
                 is_working_day = True
-                
-                try:
-                    self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+
+                no_expediente = self.wait_for_element(By.XPATH, "//div[@class='alert alert-info' and contains(text(), 'Não há expediente neste dia!')]")
+                if no_expediente:
                     is_working_day = False
-                except NoSuchElementException:
-                    pass
 
                 if is_working_day:
                     print(f"Data {check_date_str_display} é um dia de trabalho. Verificando horários...")

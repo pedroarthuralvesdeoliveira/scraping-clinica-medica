@@ -1,5 +1,6 @@
 from prefect import flow, task
 
+from app.models.enums import SistemaOrigem
 from app.services.history_seed import AppointmentHistoryService
 
 
@@ -8,9 +9,12 @@ def _get_patient_count(sistema_str: str) -> int:
     from app.core.database import get_session
     from app.models.dados_cliente import DadosCliente
 
+    sistema_enum = SistemaOrigem(sistema_str.upper())
     session = get_session()
     try:
-        return session.query(DadosCliente).filter_by(sistema_origem=sistema_str).count()
+        return session.query(DadosCliente).filter(
+            DadosCliente.sistema_origem == sistema_enum
+        ).count()
     finally:
         session.close()
 
