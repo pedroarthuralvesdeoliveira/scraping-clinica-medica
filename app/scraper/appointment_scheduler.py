@@ -449,20 +449,27 @@ class AppointmentScheduler(Browser):
                     print(f"Clique nativo falhou, tentando via JS: {e}")
                     self.execute_script("arguments[0].click();", botao_salvar)
 
+                warning_text = None
                 try:
                     erro_feedback = self.wait_for_element(By.CLASS_NAME, "alert-danger", timeout=3)
                     if erro_feedback and erro_feedback.is_displayed():
-                        print(f"ERRO DE VALIDAÇÃO NO SISTEMA: {erro_feedback.text}")
-                        self.save_screenshot("erro_validacao_sistema.png")
-                        return {"status": "error", "message": f"Sistema recusou: {erro_feedback.text}"}
+                        warning_text = erro_feedback.text
+                        print(f"AVISO DO SISTEMA (verificando se agendamento foi criado): {warning_text}")
+                        self.save_screenshot("aviso_validacao_sistema.png")
                 except:
                     pass
 
                 foi_fechado = self.wait_for_staleness_element(botao_salvar, timeout=15)
 
                 if foi_fechado:
+                    if warning_text:
+                        print("Agendamento concluído com sucesso (modal fechado apesar do aviso)!")
+                        return {"status": "success", "message": "Agendamento realizado.", "warning": warning_text}
                     print("Agendamento concluído com sucesso (modal fechado)!")
                     return {"status": "success", "message": "Agendamento realizado."}
+                elif warning_text:
+                    print("Modal não fechou após aviso. Necessário verificar agenda como fallback...")
+                    return {"status": "needs_verification", "message": warning_text}
                 else:
                     print("ALERTA: O modal de agendamento não fechou após o clique em Salvar.")
                     self.save_screenshot("erro_modal_preso.png")

@@ -69,6 +69,30 @@ def schedule_appointment_task(
             )
             print(f"Worker finalizou tarefa de agendamento. Resultado: {result}")
 
+            if result.get("status") == "needs_verification":
+                if horario_desejado:
+                    print("Iniciando verificação de agenda como fallback...")
+                    checker = AvailabilityChecker()
+                    try:
+                        avail = checker.verify_doctors_calendar(medico, data_desejada, horario_desejado)
+                        if avail.get("status") == "unavailable":
+                            result = {
+                                "status": "success",
+                                "message": "Agendamento realizado (confirmado via verificação de agenda).",
+                                "warning": result.get("message"),
+                            }
+                            print("Fallback confirmou agendamento criado.")
+                        else:
+                            result = {"status": "error", "message": result.get("message")}
+                            print("Fallback confirmou que agendamento NÃO foi criado.")
+                    except Exception as e:
+                        print(f"Erro na verificação de fallback: {e}")
+                        result = {"status": "error", "message": result.get("message")}
+                    finally:
+                        checker.quit()
+                else:
+                    result = {"status": "error", "message": result.get("message")}
+
             return result
     except Exception as e:
         print(f"Erro ao processar tarefa de agendamento (Lock/Outro): {e}")
