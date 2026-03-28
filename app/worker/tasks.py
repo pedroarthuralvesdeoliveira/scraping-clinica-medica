@@ -253,8 +253,24 @@ def get_active_patients_task():
         scraper.close()
 
 
+MEDICOS_SOFTCLYN_OF = ["ANDRÉ A. S. BAGANHA", "JOAO R.C.MATOS"]
+
+
+def _get_sistemas(nome_medico: str | None) -> list[str]:
+    """Determina quais sistemas buscar baseado no nome do médico."""
+    if nome_medico is None:
+        return ["OF", "OURO"]
+    medico_limpo = nome_medico.replace("Dr.", "").replace("Dra.", "").strip().upper()
+    for dr in MEDICOS_SOFTCLYN_OF:
+        if medico_limpo in dr.upper() or dr.upper() in medico_limpo:
+            return ["OF"]
+    return ["OURO"]
+
+
 @shared_task(name="search_patient_history_task")
-def search_patient_history_task(search_type: str, search_value: str):
+def search_patient_history_task(
+    search_type: str, search_value: str, nome_medico: str | None = None
+):
     """
     Searches for a patient by name, CPF, phone, or date of birth.
     Looks up in the database first, then scrapes from endoclin if not found.
@@ -284,9 +300,12 @@ def search_patient_history_task(search_type: str, search_value: str):
     patients_found = []
 
     try:
+        sistemas = _get_sistemas(nome_medico)
+        print(f"Sistemas a buscar: {sistemas} (nome_medico={nome_medico})")
+
         if search_type == "data_nascimento":
             patients_with_apts = _search_by_birth_date(
-                session, scraper, search_value, SistemaOrigem
+                session, scraper, search_value, SistemaOrigem, nome_medico
             )
             return {
                 "status": "success",
@@ -296,7 +315,7 @@ def search_patient_history_task(search_type: str, search_value: str):
                 "total_count": sum(len(p["appointments"]) for p in patients_with_apts),
             }
 
-        for sistema_str in ["OF", "OURO"]:
+        for sistema_str in sistemas:
             sistema_enum = SistemaOrigem(sistema_str)
             print(f"\n--- Processando sistema: {sistema_str} ---")
 
@@ -456,7 +475,7 @@ def search_patient_history_task(search_type: str, search_value: str):
 
 
 def _search_by_birth_date(
-    session, scraper, birth_date_str: str, SistemaOrigem
+    session, scraper, birth_date_str: str, SistemaOrigem, nome_medico: str | None = None
 ) -> list[dict]:
     """
     Searches for ALL patients matching a birth date across OF and OURO systems.
@@ -469,8 +488,11 @@ def _search_by_birth_date(
 
     results = []
 
-    for sistema_str in ["OF", "OURO"]:
+    sistemas = _get_sistemas(nome_medico)
+
+    for sistema_str in sistemas:
         sistema_enum = SistemaOrigem(sistema_str)
+
         scraper.set_sistema(sistema_str)
         print(f"\n--- Busca por data_nascimento no sistema: {sistema_str} ---")
 

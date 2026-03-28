@@ -96,7 +96,7 @@ def api_search_patient_history(
 
     task = celery.send_task(
         "search_patient_history_task",
-        args=[payload.search_type.value, payload.search_value],
+        args=[payload.search_type.value, payload.search_value, payload.nome_medico],
     )
 
     return TaskQueuedResponse(task_id=task.id)

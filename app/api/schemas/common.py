@@ -1,14 +1,16 @@
-from pydantic import BaseModel, Field
-from typing import Optional
 from enum import Enum
+from typing import Optional
 
+from pydantic import BaseModel, Field
 
 # ============================================================================
 # REQUEST PAYLOADS (INPUT)
 # ============================================================================
 
+
 class SchedulePayload(BaseModel):
     """Payload para agendamento de consulta"""
+
     medico: str
     data_desejada: str = Field(..., description="Data no formato DD/MM/YYYY")
     horario_desejado: str = Field(..., description="Horário no formato HH:MM")
@@ -22,6 +24,7 @@ class SchedulePayload(BaseModel):
 
 class CancelPayload(BaseModel):
     """Payload para cancelamento de consulta"""
+
     data_desejada: str = Field(..., description="Data no formato DD/MM/YYYY")
     horario_desejado: str = Field(..., description="Horário no formato HH:MM")
     medico: str
@@ -31,6 +34,7 @@ class CancelPayload(BaseModel):
 
 class SyncPayload(BaseModel):
     """Payload para sincronização de agendamentos"""
+
     cpf: str
     nome_paciente: Optional[str] = None
     medico: Optional[str] = None
@@ -39,15 +43,23 @@ class SyncPayload(BaseModel):
 
 class VerifyPayload(BaseModel):
     """Payload para verificação de disponibilidade"""
+
     data_desejada: Optional[str] = Field(None, description="Data no formato DD/MM/YYYY")
-    horario_desejado: Optional[str] = Field(None, description="Horário no formato HH:MM")
-    horario_inicial: Optional[str] = Field(None, description="Horário inicial no formato HH:MM")
-    horario_final: Optional[str] = Field(None, description="Horário final no formato HH:MM")
+    horario_desejado: Optional[str] = Field(
+        None, description="Horário no formato HH:MM"
+    )
+    horario_inicial: Optional[str] = Field(
+        None, description="Horário inicial no formato HH:MM"
+    )
+    horario_final: Optional[str] = Field(
+        None, description="Horário final no formato HH:MM"
+    )
     medico: str
 
 
 class SearchTypeEnum(str, Enum):
     """Tipos de busca de paciente"""
+
     NOME = "nome"
     CPF = "cpf"
     TELEFONE = "telefone"
@@ -56,12 +68,17 @@ class SearchTypeEnum(str, Enum):
 
 class PatientHistorySearchPayload(BaseModel):
     """Payload para busca de histórico de agendamentos por diferentes critérios"""
+
     search_type: SearchTypeEnum = Field(
         ...,
-        description="Tipo de busca: 'nome', 'cpf', 'telefone', ou 'data_nascimento'"
+        description="Tipo de busca: 'nome', 'cpf', 'telefone', ou 'data_nascimento'",
     )
     search_value: str = Field(
         ...,
         min_length=1,
-        description="Valor da busca (nome do paciente, CPF, telefone ou data de nascimento no formato DD/MM/YYYY)"
+        description="Valor da busca (nome do paciente, CPF, telefone ou data de nascimento no formato DD/MM/YYYY)",
+    )
+    nome_medico: str | None = Field(
+        None,
+        description="Nome do médico (opcional): se informado, busca apenas no sistema do médico",
     )
