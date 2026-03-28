@@ -1,13 +1,15 @@
-from app.scraper.patient_history_scraper import PatientHistoryScraper
-from app.scraper.next_appointments import NextAppointmentsScraper
-from app.scraper.get_active_patients import GetActivePatients
-from celery import shared_task
-import redis
 from contextlib import contextmanager
+
+import redis
+from celery import shared_task
+
 from app.core.dependencies import get_settings
-from app.scraper.appointment_scheduler import AppointmentScheduler
 from app.scraper.appointment_canceller import AppointmentCanceller
+from app.scraper.appointment_scheduler import AppointmentScheduler
 from app.scraper.availability_checker import AvailabilityChecker
+from app.scraper.get_active_patients import GetActivePatients
+from app.scraper.next_appointments import NextAppointmentsScraper
+from app.scraper.patient_history_scraper import PatientHistoryScraper
 
 settings = get_settings()
 redis_url = settings.redis_url
@@ -74,7 +76,9 @@ def schedule_appointment_task(
                     print("Iniciando verificação de agenda como fallback...")
                     checker = AvailabilityChecker()
                     try:
-                        avail = checker.verify_doctors_calendar(medico, data_desejada, horario_desejado)
+                        avail = checker.verify_doctors_calendar(
+                            medico, data_desejada, horario_desejado
+                        )
                         if avail.get("status") == "unavailable":
                             result = {
                                 "status": "success",
@@ -83,7 +87,10 @@ def schedule_appointment_task(
                             }
                             print("Fallback confirmou agendamento criado.")
                         else:
-                            result = {"status": "error", "message": result.get("message")}
+                            result = {
+                                "status": "error",
+                                "message": result.get("message"),
+                            }
                             print("Fallback confirmou que agendamento NÃO foi criado.")
                     except Exception as e:
                         print(f"Erro na verificação de fallback: {e}")
@@ -162,24 +169,26 @@ def get_patient_history_task(telefone: str):
     # TODO: puxa do scraping, não do banco
 
     ## Primeiro buscamos o código do paciente no banco usando o telefone
-    
+
     session = get_session()
     try:
-        patient = session.query(DadosCliente).filter(
-            DadosCliente.telefone == telefone
-        ).first()
-        
+        patient = (
+            session.query(DadosCliente)
+            .filter(DadosCliente.telefone == telefone)
+            .first()
+        )
+
         if not patient or not patient.codigo:
             return {
                 "status": "error",
-                "message": f"Paciente não encontrado para telefone: {telefone}"
+                "message": f"Paciente não encontrado para telefone: {telefone}",
             }
-        
+
         patient_code = str(patient.codigo)
         print(f"Código encontrado: {patient_code} para telefone: {telefone}")
     finally:
         session.close()
-    
+
     scraper = PatientHistoryScraper()
     try:
         result = scraper.get_patient_history(patient_code, search_type="codigo")
@@ -203,14 +212,18 @@ def get_next_appointments_task(sistema: str = "OF"):
     try:
         scraper.set_sistema(sistema)
         result = scraper.get_next_appointments()
-        
+
         appointments = result.get("appointments", [])
         if not appointments and sistema != "OURO":
-            print(f"Nenhum agendamento encontrado no sistema {sistema}. Tentando sistema OURO...")
+            print(
+                f"Nenhum agendamento encontrado no sistema {sistema}. Tentando sistema OURO..."
+            )
             scraper.set_sistema("OURO")
             result = scraper.get_next_appointments()
-            
-        print(f"Worker finalizou busca de próximos agendamentos. Status: {result.get('status')}")
+
+        print(
+            f"Worker finalizou busca de próximos agendamentos. Status: {result.get('status')}"
+        )
         return result
     except Exception as e:
         print(f"Erro ao buscar próximos agendamentos: {e}")
@@ -229,7 +242,9 @@ def get_active_patients_task():
     scraper = GetActivePatients()
     try:
         result = scraper.get_all_active_patients()
-        print(f"Worker finalizou busca de pacientes ativos. Status: {result.get('status')}")
+        print(
+            f"Worker finalizou busca de pacientes ativos. Status: {result.get('status')}"
+        )
         return result
     except Exception as e:
         print(f"Erro ao buscar pacientes ativos: {e}")
@@ -245,15 +260,15 @@ def search_patient_history_task(search_type: str, search_value: str):
     Looks up in the database first, then scrapes from endoclin if not found.
     Searches both OF and OURO systems. Returns only future appointments.
     """
+    from datetime import datetime
+
     from app.core.database import get_session
     from app.models.dados_cliente import DadosCliente
-    from app.models.telefones_paciente import TelefonesPaciente
     from app.models.enums import SistemaOrigem
-    from datetime import datetime
-    from sqlalchemy import or_
-    import re
 
-    print(f"Worker recebeu busca de histórico: tipo={search_type}, valor={search_value}")
+    print(
+        f"Worker recebeu busca de histórico: tipo={search_type}, valor={search_value}"
+    )
 
     scraper_type_map = {
         "nome": "nome",
@@ -295,13 +310,15 @@ def search_patient_history_task(search_type: str, search_value: str):
             if patient and patient.codigo:
                 identifier = str(patient.codigo)
                 effective_search_type = "codigo"
-                patients_found.append({
-                    "id": patient.id,
-                    "nome": patient.nomewpp,
-                    "codigo": patient.codigo,
-                    "sistema": sistema_str,
-                    "source": "database",
-                })
+                patients_found.append(
+                    {
+                        "id": patient.id,
+                        "nome": patient.nomewpp,
+                        "codigo": patient.codigo,
+                        "sistema": sistema_str,
+                        "source": "database",
+                    }
+                )
                 print(
                     f"Paciente encontrado no banco: codigo={patient.codigo}, "
                     f"nome={patient.nomewpp}, sistema={sistema_str}"
@@ -309,13 +326,15 @@ def search_patient_history_task(search_type: str, search_value: str):
             elif patient and not patient.codigo:
                 identifier = search_value
                 effective_search_type = scraper_search_type
-                patients_found.append({
-                    "id": patient.id,
-                    "nome": patient.nomewpp,
-                    "codigo": None,
-                    "sistema": sistema_str,
-                    "source": "database_sem_codigo",
-                })
+                patients_found.append(
+                    {
+                        "id": patient.id,
+                        "nome": patient.nomewpp,
+                        "codigo": None,
+                        "sistema": sistema_str,
+                        "source": "database_sem_codigo",
+                    }
+                )
                 print(
                     f"Paciente no banco sem codigo: nome={patient.nomewpp}, "
                     f"sistema={sistema_str}. Buscando na endoclin por {search_type}."
@@ -348,13 +367,19 @@ def search_patient_history_task(search_type: str, search_value: str):
                     if patient is None:
                         scraped = result.get("patient_info")
                         if scraped and scraped.get("codigo"):
-                            found = session.query(DadosCliente).filter(
-                                DadosCliente.codigo == int(scraped["codigo"]),
-                                DadosCliente.sistema_origem == sistema_enum,
-                            ).first()
+                            found = (
+                                session.query(DadosCliente)
+                                .filter(
+                                    DadosCliente.codigo == int(scraped["codigo"]),
+                                    DadosCliente.sistema_origem == sistema_enum,
+                                )
+                                .first()
+                            )
                             if found:
                                 try:
-                                    dob = datetime.strptime(search_value, "%d/%m/%Y").date()
+                                    dob = datetime.strptime(
+                                        search_value, "%d/%m/%Y"
+                                    ).date()
                                     found.data_nascimento = dob
                                     session.commit()
                                     print(
@@ -364,21 +389,29 @@ def search_patient_history_task(search_type: str, search_value: str):
                                 except Exception as e:
                                     session.rollback()
                                     print(f"Erro ao atualizar data_nascimento: {e}")
-                                patients_found.append({
-                                    "id": found.id,
-                                    "nome": found.nomewpp,
-                                    "codigo": found.codigo,
-                                    "sistema": sistema_str,
-                                    "source": "database_updated",
-                                })
+                                patients_found.append(
+                                    {
+                                        "id": found.id,
+                                        "nome": found.nomewpp,
+                                        "data_nascimento": found.data_nascimento,
+                                        "codigo": found.codigo,
+                                        "sistema": sistema_str,
+                                        "source": "database_updated",
+                                    }
+                                )
                             else:
-                                patients_found.append({
-                                    "id": None,
-                                    "nome": scraped.get("nome"),
-                                    "codigo": scraped.get("codigo"),
-                                    "sistema": sistema_str,
-                                    "source": "scraper",
-                                })
+                                patients_found.append(
+                                    {
+                                        "id": None,
+                                        "nome": scraped.get("nome"),
+                                        "data_nascimento": scraped.get(
+                                            "data_nascimento"
+                                        ),
+                                        "codigo": scraped.get("codigo"),
+                                        "sistema": sistema_str,
+                                        "source": "scraper",
+                                    }
+                                )
                 else:
                     print(
                         f"Scraper retornou erro para {sistema_str}: "
@@ -422,14 +455,17 @@ def search_patient_history_task(search_type: str, search_value: str):
         scraper.quit()
 
 
-def _search_by_birth_date(session, scraper, birth_date_str: str, SistemaOrigem) -> list[dict]:
+def _search_by_birth_date(
+    session, scraper, birth_date_str: str, SistemaOrigem
+) -> list[dict]:
     """
     Searches for ALL patients matching a birth date across OF and OURO systems.
     For each match, retrieves appointment history by patient code.
     Returns list of patient dicts each with their own 'appointments' list.
     """
-    from app.models.dados_cliente import DadosCliente
     from datetime import datetime
+
+    from app.models.dados_cliente import DadosCliente
 
     results = []
 
@@ -444,17 +480,23 @@ def _search_by_birth_date(session, scraper, birth_date_str: str, SistemaOrigem) 
         )
 
         if not website_patients:
-            print(f"Nenhum paciente encontrado no site {sistema_str} para {birth_date_str}.")
+            print(
+                f"Nenhum paciente encontrado no site {sistema_str} para {birth_date_str}."
+            )
             continue
 
         for wp in website_patients:
             codigo_int = int(wp["codigo"])
 
             # Check if patient exists in DB
-            db_patient = session.query(DadosCliente).filter(
-                DadosCliente.codigo == codigo_int,
-                DadosCliente.sistema_origem == sistema_enum,
-            ).first()
+            db_patient = (
+                session.query(DadosCliente)
+                .filter(
+                    DadosCliente.codigo == codigo_int,
+                    DadosCliente.sistema_origem == sistema_enum,
+                )
+                .first()
+            )
 
             source = "database" if db_patient else "scraper"
 
@@ -464,7 +506,9 @@ def _search_by_birth_date(session, scraper, birth_date_str: str, SistemaOrigem) 
                     dob = datetime.strptime(birth_date_str, "%d/%m/%Y").date()
                     db_patient.data_nascimento = dob
                     session.commit()
-                    print(f"data_nascimento atualizada para codigo={codigo_int}, sistema={sistema_str}")
+                    print(
+                        f"data_nascimento atualizada para codigo={codigo_int}, sistema={sistema_str}"
+                    )
                 except Exception as e:
                     session.rollback()
                     print(f"Erro ao atualizar data_nascimento: {e}")
@@ -486,16 +530,20 @@ def _search_by_birth_date(session, scraper, birth_date_str: str, SistemaOrigem) 
                     key=lambda x: datetime.strptime(x["data_atendimento"], "%d/%m/%Y"),
                     reverse=True,
                 )
-                print(f"  {len(appointments)} agendamento(s) para {wp['nome']} ({sistema_str})")
+                print(
+                    f"  {len(appointments)} agendamento(s) para {wp['nome']} ({sistema_str})"
+                )
 
-            results.append({
-                "id": db_patient.id if db_patient else None,
-                "nome": db_patient.nomewpp if db_patient else wp["nome"],
-                "codigo": codigo_int,
-                "sistema": sistema_str,
-                "source": source,
-                "appointments": appointments,
-            })
+            results.append(
+                {
+                    "id": db_patient.id if db_patient else None,
+                    "nome": db_patient.nomewpp if db_patient else wp["nome"],
+                    "codigo": codigo_int,
+                    "sistema": sistema_str,
+                    "source": source,
+                    "appointments": appointments,
+                }
+            )
 
     return results
 
@@ -505,11 +553,13 @@ def _find_patient_in_db(session, search_type, search_value, sistema_enum):
     Searches for a patient in dados_cliente by the given criteria.
     Returns the first matching DadosCliente or None.
     """
+    import re
+    from datetime import datetime
+
+    from sqlalchemy import or_
+
     from app.models.dados_cliente import DadosCliente
     from app.models.telefones_paciente import TelefonesPaciente
-    from datetime import datetime
-    from sqlalchemy import or_
-    import re
 
     base_query = session.query(DadosCliente).filter(
         DadosCliente.sistema_origem == sistema_enum
@@ -522,9 +572,7 @@ def _find_patient_in_db(session, search_type, search_value, sistema_enum):
 
     elif search_type == "cpf":
         cpf_digits = re.sub(r"\D", "", search_value)
-        return base_query.filter(
-            DadosCliente.cpf == cpf_digits
-        ).first()
+        return base_query.filter(DadosCliente.cpf == cpf_digits).first()
 
     elif search_type == "telefone":
         phone_digits = re.sub(r"\D", "", search_value)
@@ -543,13 +591,15 @@ def _find_patient_in_db(session, search_type, search_value, sistema_enum):
             return patient
 
         # Check telefones_paciente table
-        tel_record = session.query(TelefonesPaciente).join(
-            DadosCliente,
-            TelefonesPaciente.cliente_codigo == DadosCliente.id
-        ).filter(
-            DadosCliente.sistema_origem == sistema_enum,
-            TelefonesPaciente.numero.like(f"%{phone_digits}%"),
-        ).first()
+        tel_record = (
+            session.query(TelefonesPaciente)
+            .join(DadosCliente, TelefonesPaciente.cliente_codigo == DadosCliente.id)
+            .filter(
+                DadosCliente.sistema_origem == sistema_enum,
+                TelefonesPaciente.numero.like(f"%{phone_digits}%"),
+            )
+            .first()
+        )
 
         if tel_record:
             return session.query(DadosCliente).get(tel_record.cliente_codigo)
@@ -563,8 +613,6 @@ def _find_patient_in_db(session, search_type, search_value, sistema_enum):
             print(f"Formato de data inválido: {search_value}. Esperado DD/MM/YYYY.")
             return None
 
-        return base_query.filter(
-            DadosCliente.data_nascimento == dob
-        ).first()
+        return base_query.filter(DadosCliente.data_nascimento == dob).first()
 
     return None
