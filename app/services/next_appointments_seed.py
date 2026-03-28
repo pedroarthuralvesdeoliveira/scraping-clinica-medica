@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from app.core.database import get_session
 from app.models.agendamento import Agendamento
 from app.models.enums import SistemaOrigem
@@ -18,6 +18,7 @@ class NextAppointmentsService:
             "total_scraped": 0,
             "added": 0,
             "updated": 0,
+            "cancelled": 0,
             "errors": 0
         }
 
@@ -45,23 +46,30 @@ class NextAppointmentsService:
 
                     sistema = SistemaOrigem.OURO
 
-                    # Check for existing appointment using the same constraint as the DB: (codigo, sistema_origem)
                     existing = session.query(Agendamento).filter_by(
                         codigo=codigo_int,
                         sistema_origem=sistema.value,
+                        data_consulta=apt_data.get("data_consulta"),
+                        hora_consulta=apt_data.get("hora_consulta"),
                     ).first()
+
+                    patient = session.query(DadosCliente).filter(
+                        DadosCliente.codigo == codigo_int
+                    ).first()
+
+                    now = datetime.now()
 
                     if existing:
                         existing.status = apt_data.get("status")
                         existing.procedimento = apt_data.get("procedimento")
-                        existing.data_consulta = apt_data.get("data_consulta")
-                        existing.hora_consulta = apt_data.get("hora_consulta")
+                        existing.profissional = apt_data.get("profissional") or existing.profissional
+                        existing.updated_at = now
+                        if patient:
+                            existing.nome_paciente = patient.nomewpp or existing.nome_paciente
+                            if patient.data_nascimento:
+                                existing.data_nascimento = patient.data_nascimento
                         stats["updated"] += 1
                     else:
-                        patient = session.query(DadosCliente).filter(
-                            DadosCliente.codigo == codigo_int
-                        ).first()
-
                         prof_name = apt_data.get("profissional")
                         prof_id = get_or_create_professional(session, prof_name, sistema)
 
@@ -70,7 +78,7 @@ class NextAppointmentsService:
                             profissional_id=prof_id,
                             sistema_origem=sistema.value,
                             codigo=codigo_int,
-                            nome_paciente=apt_data.get("nome_paciente") or "",
+                            nome_paciente=patient.nomewpp if patient and patient.nomewpp else (apt_data.get("nome_paciente") or ""),
                             telefone=apt_data.get("telefone") or "",
                             cpf=patient.cpf if patient and patient.cpf else "",
                             data_nascimento=patient.data_nascimento if patient and patient.data_nascimento else datetime(1900, 1, 1).date(),
@@ -82,6 +90,7 @@ class NextAppointmentsService:
                             status=apt_data.get("status"),
                             primeira_consulta=apt_data.get("primeira_consulta"),
                             observacoes=apt_data.get("observacoes"),
+                            created_at=now,
                         )
                         session.add(new_apt)
                         stats["added"] += 1
@@ -90,6 +99,35 @@ class NextAppointmentsService:
                     print(f"Error processing appointment for code {apt_data.get('codigo')}: {e}")
                     session.rollback()
                     stats["errors"] += 1
+
+            # Detect cancelled/deleted appointments:
+            # Appointments in DB within the scraped date range but NOT in the Excel
+            scraped_keys = set()
+            for apt_data in appointments_data:
+                codigo_str = apt_data.get("codigo")
+                if codigo_str and codigo_str.isdigit():
+                    scraped_keys.add(
+                        (int(codigo_str), apt_data.get("data_consulta"), apt_data.get("hora_consulta"))
+                    )
+
+            today = date.today()
+            end_date = today + timedelta(days=30)
+            sistema = SistemaOrigem.OURO
+
+            db_future_appointments = session.query(Agendamento).filter(
+                Agendamento.sistema_origem == sistema.value,
+                Agendamento.data_consulta >= today,
+                Agendamento.data_consulta <= end_date,
+                Agendamento.status != "Cancelado",
+            ).all()
+
+            now = datetime.now()
+            for db_apt in db_future_appointments:
+                key = (db_apt.codigo, db_apt.data_consulta, db_apt.hora_consulta)
+                if key not in scraped_keys:
+                    db_apt.status = "Cancelado"
+                    db_apt.updated_at = now
+                    stats["cancelled"] += 1
 
             session.commit()
             return {"status": "success", "stats": stats}

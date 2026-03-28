@@ -29,4 +29,5 @@ async def patient_sync_flow():
     return result
 
 if __name__ == "__main__":
-    patient_sync_flow()
+    import asyncio
+    asyncio.run(patient_sync_flow())

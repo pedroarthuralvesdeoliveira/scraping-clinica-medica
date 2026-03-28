@@ -55,7 +55,6 @@ def schedule_appointment_task(
     print(f"Worker recebeu tarefa de agendamento para: {paciente_info.get('nome')}")
 
     cpf = paciente_info.get("cpf", "unknown")
-    nome = paciente_info.get("nome", "unknown")
     horario = horario_desejado if horario_desejado else "any"
     lock_key = f"lock:schedule:{medico}:{data_desejada}:{horario}:{cpf}"
 

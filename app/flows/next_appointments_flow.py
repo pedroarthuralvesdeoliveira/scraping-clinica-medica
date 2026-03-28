@@ -22,7 +22,7 @@ async def next_appointments_sync_flow():
     
     if result.get("status") == "success":
         stats = result.get("stats", {})
-        print(f"Sincronização concluída: {stats.get('added')} novos, {stats.get('updated')} atualizados.")
+        print(f"Sincronização concluída: {stats.get('added')} novos, {stats.get('updated')} atualizados, {stats.get('cancelled', 0)} cancelados.")
     else:
         print(f"Erro ao buscar agendamentos: {result.get('message')}")
         

@@ -19,6 +19,12 @@ from datetime import date
 
 class Agendamento(Base):
     __tablename__ = "agendamentos"
+    __table_args__ = (
+        UniqueConstraint(
+            "codigo", "sistema_origem", "data_consulta", "hora_consulta",
+            name="uq_agendamento_codigo_sistema_data_hora",
+        ),
+    )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     created_at = Column(DateTime(timezone=True))

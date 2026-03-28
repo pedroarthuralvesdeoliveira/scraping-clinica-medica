@@ -141,4 +141,5 @@ async def history_sync_flow(
 
 
 if __name__ == "__main__":
-    history_sync_flow(skip_if_has_recent_history=True, days_threshold=7)
+    import asyncio
+    asyncio.run(history_sync_flow(skip_if_has_recent_history=True, days_threshold=7))
