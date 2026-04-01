@@ -14,6 +14,65 @@ settings = get_settings()
 class AppointmentCanceller(Browser):
     def __init__(self):
         super().__init__()
+
+    @staticmethod
+    def _normalize_text(value: str | None) -> str:
+        return " ".join((value or "").split()).casefold()
+
+    def _find_cancel_click_target(self, horario_id: str, nome_paciente: str):
+        row_xpath = f"//tr[@id='{horario_id}']"
+        row = self.wait_for_element(By.XPATH, row_xpath)
+
+        if not row:
+            print(f"ERRO: Linha da grade para o horário {horario_id} não encontrada.")
+            return None
+
+        row_text = self._normalize_text(row.text)
+        patient_name = self._normalize_text(nome_paciente)
+        print(f"Conteúdo encontrado na linha {horario_id}: {row.text!r}")
+
+        if patient_name and patient_name not in row_text:
+            print(
+                f"Paciente '{nome_paciente}' não encontrado no texto da linha {horario_id}."
+            )
+            return None
+
+        trash_icons = row.find_elements(By.XPATH, ".//*[contains(@class, 'glyphicon-trash')]")
+        if not trash_icons:
+            print(f"Nenhum ícone de cancelamento encontrado na linha {horario_id}.")
+            return None
+
+        for trash_icon in trash_icons:
+            onclick = self._normalize_text(trash_icon.get_attribute("onclick"))
+            ancestor_onclick = None
+
+            try:
+                ancestor_onclick = trash_icon.find_element(By.XPATH, "./ancestor::*[@onclick][1]")
+            except Exception:
+                ancestor_onclick = None
+
+            ancestor_onclick_attr = self._normalize_text(
+                ancestor_onclick.get_attribute("onclick") if ancestor_onclick else ""
+            )
+
+            if patient_name and (
+                patient_name in onclick or patient_name in ancestor_onclick_attr
+            ):
+                return ancestor_onclick or trash_icon
+
+        if len(trash_icons) == 1:
+            print(
+                "Usando o único ícone de cancelamento disponível na linha do horário."
+            )
+            try:
+                return trash_icons[0].find_element(By.XPATH, "./ancestor::*[@onclick][1]")
+            except Exception:
+                return trash_icons[0]
+
+        print(
+            f"Foram encontrados {len(trash_icons)} ícones de cancelamento na linha {horario_id}, sem correspondência inequívoca para '{nome_paciente}'."
+        )
+        return None
         
     def _check_scheduled_time(self, data_desejada: str):
         dateAppointment = self.wait_for_element(By.ID, "dataAgenda")
@@ -88,12 +147,23 @@ class AppointmentCanceller(Browser):
             self._is_timetable()
 
             horario_id = horario_desejado.replace(":", "") + "00"
-            cancel_span_xpath = f"//tr[@id='{horario_id}']//span[contains(@onclick, '{nome_paciente}') and contains(@class, 'glyphicon-trash')]"
 
             try:
-                cancel_span = self.wait_for_element(By.XPATH, cancel_span_xpath)
+                cancel_click_target = self._find_cancel_click_target(
+                    horario_id, nome_paciente
+                )
 
-                self.execute_script("arguments[0].click();", cancel_span)
+                if not cancel_click_target:
+                    print(
+                        f"Erro: Não foi possível localizar um acionador de cancelamento para o paciente {nome_paciente} no horário {horario_desejado}."
+                    )
+                    self.save_screenshot("cancel_trigger_not_found.png")
+                    return {"status": "error", "message": "Agendamento não encontrado."}
+
+                try:
+                    cancel_click_target.click()
+                except Exception:
+                    self.execute_script("arguments[0].click();", cancel_click_target)
                 print(
                     f"Ícone de cancelamento para o paciente {nome_paciente} no horário {horario_desejado} clicado."
                 )

@@ -110,7 +110,12 @@ class Browser:
 
     def quit(self):
         if self.driver:
-            self.driver.quit()
+            try:
+                self.driver.quit()
+            except Exception as e:
+                print(f"Could not close browser cleanly: {e}")
+            finally:
+                self.driver = None
 
     def close(self):
         self.quit()
@@ -293,15 +298,18 @@ class Browser:
             print(f"Erro ao fechar modal: {e}")
 
     def _is_timetable(self):
-        try:
-            self.wait_for_element(By.XPATH, "//tr[@id='070000']")
-            self.wait_for_element(
-                By.XPATH,
-                "//div[contains(@class, 'alert-info') and contains(text(), 'expediente')]",
-            )
+        timetable_row = self.wait_for_element(By.XPATH, "//tr[@id='070000']")
+        no_schedule_alert = self.wait_for_element(
+            By.XPATH,
+            "//div[contains(@class, 'alert-info') and contains(text(), 'expediente')]",
+        )
+
+        if timetable_row or no_schedule_alert:
             print("Grade de horários ou mensagem de expediente (re)carregada após JS.")
-        except TimeoutException:
-            print(
-                "ERRO: A grade não recarregou após a injeção de JS. Verifique o screenshot."
-            )
-            self.save_screenshot("debug_data_nao_recarregou_js.png")
+            return
+
+        print(
+            "ERRO: A grade não recarregou após a injeção de JS. Verifique o screenshot."
+        )
+        self.save_screenshot("debug_data_nao_recarregou_js.png")
+        raise TimeoutException("Grade de horários não carregou após definir a data.")
