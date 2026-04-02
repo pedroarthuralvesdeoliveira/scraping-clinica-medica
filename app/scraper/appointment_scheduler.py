@@ -432,7 +432,7 @@ class AppointmentScheduler(Browser):
 
             if botao_salvar:
                 try:
-                    self.driver.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
+                    self.execute_script("arguments[0].scrollIntoView(true);", botao_salvar)
                     time.sleep(1)
                     botao_salvar.click()
                     print("Botão 'Salvar' clicado nativamente.")
@@ -442,15 +442,33 @@ class AppointmentScheduler(Browser):
 
                 warning_text = None
                 try:
-                    erro_feedback = self.wait_for_element(By.CLASS_NAME, "alert-danger", timeout=3)
-                    if erro_feedback and erro_feedback.is_displayed():
-                        warning_text = erro_feedback.text
-                        print(f"AVISO DO SISTEMA (verificando se agendamento foi criado): {warning_text}")
-                        self.save_screenshot("aviso_validacao_sistema.png")
-                except:
+                    alert_selectors = [
+                        (By.CLASS_NAME, "alert-danger"),
+                        (By.CLASS_NAME, "alert-warning"),
+                        (By.CLASS_NAME, "alert-info"),
+                        (By.CSS_SELECTOR, ".swal2-popup"),
+                        (By.CSS_SELECTOR, ".sweet-alert"),
+                        (By.CSS_SELECTOR, ".has-error .help-block"),
+                        (By.CSS_SELECTOR, ".is-invalid"),
+                        (By.CSS_SELECTOR, ".invalid-feedback"),
+                        (By.CSS_SELECTOR, ".toast-message"),
+                    ]
+                    for by, selector in alert_selectors:
+                        try:
+                            elemento = self.wait_for_element(by, selector, timeout=2)
+                            if elemento and elemento.is_displayed():
+                                texto = elemento.text.strip()
+                                if texto:
+                                    warning_text = texto
+                                    print(f"AVISO DO SISTEMA ({selector}): {warning_text}")
+                                    self.save_screenshot("aviso_validacao_sistema.png")
+                                    break
+                        except Exception:
+                            continue
+                except Exception:
                     pass
 
-                foi_fechado = self.wait_for_staleness_element(botao_salvar, timeout=15)
+                foi_fechado = self.wait_for_staleness_element(botao_salvar, timeout=25)
 
                 if foi_fechado:
                     if warning_text:
@@ -464,6 +482,24 @@ class AppointmentScheduler(Browser):
                 else:
                     print("ALERTA: O modal de agendamento não fechou após o clique em Salvar.")
                     self.save_screenshot("erro_modal_preso.png")
+
+                    try:
+                        modal = self.find_element(By.CSS_SELECTOR, ".modal.in, .modal.show, .modal[style*='display: block']")
+                        modal_text = modal.text.strip()
+                        if modal_text:
+                            print(f"CONTEÚDO VISÍVEL DO MODAL:\n{modal_text[:500]}")
+                    except Exception:
+                        print("Não foi possível capturar o conteúdo do modal.")
+
+                    try:
+                        if self.driver:
+                            logs = self.driver.get_log("browser")
+                            erros_js = [l for l in logs if l.get("level") in ("SEVERE", "WARNING")]
+                            if erros_js:
+                                print(f"ERROS/AVISOS DO CONSOLE JS: {erros_js[:5]}")
+                    except Exception:
+                        pass
+
                     return {"status": "error", "message": "O modal de agendamento não fechou."}
 
             else:
