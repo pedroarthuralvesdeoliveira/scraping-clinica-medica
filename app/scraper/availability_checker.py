@@ -26,9 +26,8 @@ class AvailabilityChecker(Browser):
 
             try:
                 dateAppointment = self.wait_for_element(By.ID, "dataAgenda")
-                self.execute_script("arguments[0].value = arguments[1];", dateAppointment, data_formatada_iso)
-                self.execute_script("arguments[0].dispatchEvent(new Event('blur'));", dateAppointment)
-                print(f"Data {data_formatada_iso} injetada e 'onblur' disparado.")
+                self._set_date(dateAppointment, data_formatada_iso)
+                print(f"Data {data_formatada_iso} injetada e eventos disparados.")
             except Exception as e:
                 print(f"Erro ao tentar injetar data com JavaScript: {e}")
                 self.save_screenshot("debug_data_javascript_falhou_1.png")
@@ -85,9 +84,8 @@ class AvailabilityChecker(Browser):
 
             try:
                 dateAppointment = self.wait_for_element(By.ID, "dataAgenda")
-                self.execute_script("arguments[0].value = arguments[1];", dateAppointment, data_formatada_iso)
-                self.execute_script("arguments[0].dispatchEvent(new Event('blur'));", dateAppointment)
-                print(f"Data {data_formatada_iso} injetada e 'onblur' disparado.")
+                self._set_date(dateAppointment, data_formatada_iso)
+                print(f"Data {data_formatada_iso} injetada e eventos disparados.")
             except Exception as e:
                 print(f"Erro ao tentar injetar data com JavaScript: {e}")
                 self.save_screenshot("debug_data_javascript_falhou_2.png")
@@ -136,8 +134,7 @@ class AvailabilityChecker(Browser):
 
                 try:
                     dateAppointment = self.wait_for_element(By.ID, "dataAgenda")
-                    self.execute_script("arguments[0].value = arguments[1];", dateAppointment, check_date_iso)
-                    self.execute_script("arguments[0].dispatchEvent(new Event('blur'));", dateAppointment)
+                    self._set_date(dateAppointment, check_date_iso)
                 except Exception as e:
                     print(f"Erro ao injetar data {check_date_iso} via JS: {e}. Pulando dia.")
                     self.save_screenshot(f"debug_js_loop_fail_{check_date_iso}.png")
@@ -153,7 +150,7 @@ class AvailabilityChecker(Browser):
                     continue
 
                 try:
-                    self.wait_for_element(By.XPATH, "//tr[@id='070000']")
+                    self.wait_for_element(By.XPATH, "//tr[@class='ui-droppable']")
                     self.wait_for_element(By.XPATH, "//div[contains(@class, 'alert-info') and contains(text(), 'expediente')]")
                 except TimeoutException:
                     print(f"A grade de horários para {check_date_str_display} não carregou (Timeout). Pulando.")

@@ -148,17 +148,8 @@ class AppointmentScheduler(Browser):
                 return {"status": "error", "message": "Data em formato inválido."}
 
             try:
-                self.execute_script(
-                    "arguments[0].value = arguments[1];",
-                    dateAppointment,
-                    data_formatada_para_input,
-                )
-                print("Valor da data injetado via JavaScript.")
-
-                print("Disparando 'onblur' via JavaScript para carregar a grade...")
-                self.execute_script(
-                    "arguments[0].dispatchEvent(new Event('blur'));", dateAppointment
-                )
+                self._set_date(dateAppointment, data_formatada_para_input)
+                print("Data injetada e eventos disparados.")
 
             except Exception as e:
                 print(f"Erro ao tentar injetar data com JavaScript: {e}")

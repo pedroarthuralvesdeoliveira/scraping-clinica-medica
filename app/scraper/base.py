@@ -297,8 +297,20 @@ class Browser:
         except Exception as e:
             print(f"Erro ao fechar modal: {e}")
 
+    def _set_date(self, element, iso_date: str):
+        self.execute_script("""
+            var el = arguments[0];
+            el.value = arguments[1];
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+            el.dispatchEvent(new Event('blur', {bubbles: true}));
+        """, element, iso_date)
+        time.sleep(0.5)
+
     def _is_timetable(self):
-        timetable_row = self.wait_for_element(By.XPATH, "//tr[@id='070000']")
+        timetable_row = self.wait_for_element(
+            By.XPATH, "//tr[@class='ui-droppable']"
+        )
         no_schedule_alert = self.wait_for_element(
             By.XPATH,
             "//div[contains(@class, 'alert-info') and contains(text(), 'expediente')]",
