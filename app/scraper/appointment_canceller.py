@@ -160,7 +160,7 @@ class AppointmentCanceller(Browser):
                 )
 
                 
-                desmarcado_button = self.wait_for_element(By.CSS_SELECTOR, "button[data-bb-handler='danger']")
+                desmarcado_button = self.wait_for_element(By.CSS_SELECTOR, "button[data-bb-handler='main']")
                 
                 if not desmarcado_button:
                     print("ERRO: Botão 'Desmarcado' do modal não encontrado.")
@@ -186,22 +186,6 @@ class AppointmentCanceller(Browser):
                                         
                 time.sleep(2)
     
-                reason_input = self.wait_for_element(By.CSS_SELECTOR, "input.bootbox-input-text")
-                if not reason_input:
-                    print("ERRO: Campo de motivo não encontrado.")
-                    raise TimeoutException("Campo de motivo não encontrado.")
-    
-                reason_input.send_keys("não disse o motivo")
-                print("Motivo do cancelamento preenchido.")
-                
-                confirm_button = self.wait_for_element(By.CSS_SELECTOR, "button[data-bb-handler='confirm']")
-                if not confirm_button:
-                    print("ERRO: Botão de confirmação de motivo não encontrado.")
-                    raise TimeoutException("Botão de confirmação de motivo não encontrado.")
-    
-                self.execute_script("arguments[0].click();", confirm_button)
-                print("Botão de confirmação do motivo clicado.")
-                time.sleep(2)
     
                 print("Cancelamento concluído com sucesso!")
                 return {"status": "success", "message": "Agendamento cancelado."}
